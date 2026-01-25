@@ -1,0 +1,241 @@
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --radius: 8px;
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --header-height: 60px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.pos-container {
+  display: flex;
+  height: 100vh;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pos-left {
+  flex: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.pos-right {
+  flex: 1;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.pos-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 600;
+  transition: all 0.2s;
+  padding: 12px 20px;
+  font-size: 1rem;
+}
+
+button.primary {
+  background: var(--primary);
+  color: white;
+}
+
+button.primary:hover {
+  background: var(--primary-hover);
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 15px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.product-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.product-item:hover {
+  border-color: var(--primary);
+}
+
+.cart-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cart-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qty-btn {
+  padding: 4px 10px;
+  background: var(--bg);
+}
+
+.cart-summary {
+  padding: 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.summary-total {
+  font-size: 1.5rem;
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white;
+  }
+
+  .pos-container,
+  .no-print {
+    display: none !important;
+  }
+
+  .receipt-container {
+    display: block !important;
+    width: 60mm;
+    /* Narrower for thermal */
+    margin: 0 auto;
+    padding: 0;
+    font-size: 11px;
+    font-family: 'Courier New', Courier, monospace;
+    color: black;
+  }
+
+  .receipt-header {
+    text-align: center;
+    margin-bottom: 5px;
+  }
+
+  .receipt-header h1 {
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .receipt-header p {
+    font-size: 9px;
+    margin: 1px 0;
+  }
+
+  .divider {
+    text-align: center;
+    margin: 4px 0;
+  }
+
+  .receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .receipt-table th {
+    border-bottom: 1px dashed black;
+    padding-bottom: 3px;
+    font-size: 10px;
+  }
+
+  .receipt-table td {
+    padding: 4px 0;
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .receipt-footer {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 9px;
+  }
+}
+
+/* Hide receipt on screen */
+.receipt-container {
+  display: none;
+}
