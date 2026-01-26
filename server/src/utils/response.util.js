@@ -8,7 +8,11 @@ export const getSuccessResponse = ({ message, data = null, status = 200 }) => {
   return response;
 };
 
-export const getFailureResponse = ({message, status = "error", statusCode}) => {
+export const getFailureResponse = ({
+  message,
+  status = "error",
+  statusCode,
+}) => {
   return {
     status: status,
     error: {

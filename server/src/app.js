@@ -1,13 +1,10 @@
 import express from "express";
 import cors from "cors";
 import indexRouter from "./routes/index.routes.js";
-// import {
-//   errorHandler,
-//   jwtHandler,
-//   notFoundHandler,
-//   validationHandler,
-// } from "./middlewares/error.middleware.js";
-// import cookieParser from "cookie-parser";
+import {
+  errorHandler,
+  notFoundHandler,
+} from "./middlewares/errorHandler.middleware.js";
 
 const app = express();
 
@@ -17,9 +14,7 @@ app.use(cors());
 
 app.use("/api/v1", indexRouter);
 
-// app.use(validationHandler);
-// app.use(jwtHandler);
-// app.use(notFoundHandler);
-// app.use(errorHandler);
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;
