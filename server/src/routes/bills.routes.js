@@ -5,12 +5,13 @@ import {
   getBillById,
   voidBill,
 } from "../controllers/bills.controller.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
 
 const router = Router();
 
-router.post("/", createBill);
-router.get("/:bill_id", getBillById);
-router.get("/", getAllBills);
-router.patch("/:bill_id/void", voidBill);
+router.post("/", requireAuth, createBill);
+router.get("/:bill_id", requireAuth, getBillById);
+router.get("/", requireAuth, getAllBills);
+router.patch("/:bill_id/void", requireAuth, voidBill);
 
 export default router;
