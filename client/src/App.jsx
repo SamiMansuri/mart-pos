@@ -1,87 +1,127 @@
-import POS from './pages/POS'
-import Reports from './pages/Reports'
-import Products from './pages/Products'
-import CashControl from './pages/CashControl'
-import { useState } from 'react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './layouts/Layout';
+import BillsList from './pages/BillsList';
+import CreateBill from './pages/CreateBill';
+import LoginPage from './pages/LoginPage';
+import CashierDashboard from './pages/CashierDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import BillHistory from './pages/BillHistory';
+import AddProduct from './pages/AddProduct';
+import ProductsList from './pages/ProductsList';
+import UpdateProduct from './pages/UpdateProduct';
+import CreateEmployee from './pages/CreateEmployee';
+import EmployeeList from './pages/EmployeeList';
+import { getUserInfo, isTokenExpired } from './utils/auth.utils';
+
+// Guard for authenticated sessions
+const AuthGuard = ({ children }) => {
+  const user = getUserInfo();
+  if (!user || isTokenExpired()) {
+    // Clear potentially invalid/expired token
+    localStorage.removeItem('token');
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+// Guard for role-based access
+const RoleGuard = ({ children, allowedRoles }) => {
+  const user = getUserInfo();
+  if (!user || isTokenExpired()) {
+    localStorage.removeItem('token');
+    return <Navigate to="/login" replace />;
+  }
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/cashier'} replace />;
+  }
+  return children;
+};
+
+// Component to handle root redirect based on role
+const RootRedirect = () => {
+  const user = getUserInfo();
+  if (!user || isTokenExpired()) {
+    localStorage.removeItem('token');
+    return <Navigate to="/login" replace />;
+  }
+  return <Navigate to={user.role === 'admin' ? '/admin' : '/cashier'} replace />;
+};
+
+const NotFound = () => <div className="text-center mt-5 py-5">
+  <h1 className="display-1 fw-800 text-primary opacity-50">404</h1>
+  <h4 className="fw-bold">TERMINAL NOT FOUND</h4>
+  <p className="text-muted">The requested system node does not exist.</p>
+</div>;
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('POS');
-
   return (
-    <div className="App">
-      <nav className="no-print" style={{ 
-        background: 'var(--card-bg)', 
-        borderBottom: '1px solid var(--border)',
-        padding: '0 20px',
-        display: 'flex',
-        gap: '20px',
-        height: '50px',
-        alignItems: 'center'
-      }}>
-        <button 
-          onClick={() => setCurrentPage('POS')}
-          style={{ 
-            background: 'transparent', 
-            color: currentPage === 'POS' ? 'var(--primary)' : 'var(--text)',
-            borderBottom: currentPage === 'POS' ? '2px solid var(--primary)' : 'none',
-            borderRadius: 0,
-            padding: '0 10px',
-            height: '100%',
-            fontWeight: currentPage === 'POS' ? 700 : 400
-          }}
-        >
-          POS
-        </button>
-        <button 
-          onClick={() => setCurrentPage('Products')}
-          style={{ 
-            background: 'transparent', 
-            color: currentPage === 'Products' ? 'var(--primary)' : 'var(--text)',
-            borderBottom: currentPage === 'Products' ? '2px solid var(--primary)' : 'none',
-            borderRadius: 0,
-            padding: '0 10px',
-            height: '100%',
-            fontWeight: currentPage === 'Products' ? 700 : 400
-          }}
-        >
-          Products
-        </button>
-        <button 
-          onClick={() => setCurrentPage('CashControl')}
-          style={{ 
-            background: 'transparent', 
-            color: currentPage === 'CashControl' ? 'var(--primary)' : 'var(--text)',
-            borderBottom: currentPage === 'CashControl' ? '2px solid var(--primary)' : 'none',
-            borderRadius: 0,
-            padding: '0 10px',
-            height: '100%',
-            fontWeight: currentPage === 'CashControl' ? 700 : 400
-          }}
-        >
-          Cash Control
-        </button>
-        <button 
-          onClick={() => setCurrentPage('Reports')}
-          style={{ 
-            background: 'transparent', 
-            color: currentPage === 'Reports' ? 'var(--primary)' : 'var(--text)',
-            borderBottom: currentPage === 'Reports' ? '2px solid var(--primary)' : 'none',
-            borderRadius: 0,
-            padding: '0 10px',
-            height: '100%',
-            fontWeight: currentPage === 'Reports' ? 700 : 400
-          }}
-        >
-          Sales Summary
-        </button>
-      </nav>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
 
-      {currentPage === 'POS' && <POS />}
-      {currentPage === 'Products' && <Products />}
-      {currentPage === 'CashControl' && <CashControl />}
-      {currentPage === 'Reports' && <Reports />}
-    </div>
-  )
+        <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
+          <Route index element={<RootRedirect />} />
+
+          {/* Cashier Routes - Accessible by both cashier and admin */}
+          <Route path="cashier" element={
+            <RoleGuard allowedRoles={['cashier', 'admin']}>
+              <CashierDashboard />
+            </RoleGuard>
+          } />
+          <Route path="bills/create" element={
+            <RoleGuard allowedRoles={['cashier', 'admin']}>
+              <CreateBill />
+            </RoleGuard>
+          } />
+          <Route path="history" element={
+            <RoleGuard allowedRoles={['cashier', 'admin']}>
+              <BillHistory />
+            </RoleGuard>
+          } />
+
+          {/* Admin Routes - Only accessible by admin */}
+          <Route path="admin" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <AdminDashboard />
+            </RoleGuard>
+          } />
+          <Route path="admin/products/add" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <AddProduct />
+            </RoleGuard>
+          } />
+          <Route path="admin/products" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <ProductsList />
+            </RoleGuard>
+          } />
+          <Route path="admin/products/edit/:id" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <UpdateProduct />
+            </RoleGuard>
+          } />
+          <Route path="admin/users/create" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <CreateEmployee />
+            </RoleGuard>
+          } />
+          <Route path="admin/users" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <EmployeeList />
+            </RoleGuard>
+          } />
+          <Route path="bills" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <BillsList />
+            </RoleGuard>
+          } />
+
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
