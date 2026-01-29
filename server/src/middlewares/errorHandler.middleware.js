@@ -2,6 +2,7 @@ import { getFailureResponse } from "../utils/response.util.js";
 import createHttpError from "http-errors";
 
 export const errorHandler = (error, req, res, next) => {
+  console.log(error);
   const statusCode = error.statusCode || 500;
   const status = error.errorType || "error";
   const message = error.message || "Something went wrong";

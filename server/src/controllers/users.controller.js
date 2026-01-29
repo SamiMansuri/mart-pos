@@ -30,3 +30,18 @@ export const createUser = asyncHandler(async (req, res) => {
     }),
   );
 });
+
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, name, user_name, role
+      FROM users`
+  );
+  res.json(
+    getSuccessResponse({
+      data: result.rows,
+      message: "Users fetched successfully",
+      status: 200,
+    }),
+  );
+});
+

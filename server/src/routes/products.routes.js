@@ -5,12 +5,14 @@ import {
   createProduct,
   updateProduct,
 } from "../controllers/products.controller.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
+import { allowAdmin } from "../middlewares/allowAdmin.js";
 
 const router = express.Router();
 
-router.get("/", getAllProducts);
-router.get("/:product_id", getProductById);
-router.post("/", createProduct);
-router.put("/:product_id", updateProduct);
+router.get("/", requireAuth, getAllProducts);
+router.get("/:product_id", requireAuth, getProductById);
+router.post("/", requireAuth, allowAdmin, createProduct);
+router.put("/:product_id", requireAuth, allowAdmin, updateProduct);
 
 export default router;
