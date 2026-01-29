@@ -4,11 +4,7 @@ import { asyncHandler } from "../utils/asynHandler.util.js";
 import { getSuccessResponse } from "../utils/response.util.js";
 import { withTransaction } from "../utils/transaction.util.js";
 import normalizeItems from "../helper/normalizeItems.js";
-import {
-  getRefundedAmount,
-  getReturnedQtyMap,
-  hasRefunds,
-} from "../services/bill.service.js";
+import { getRefundedAmount, getReturnedQtyMap, hasRefunds, logBillEvent } from "../services/bill.service.js";
 
 export const createBill = asyncHandler(async (req, res) => {
   const { items, payment_method, idempotency_key } = req.body;
@@ -25,7 +21,7 @@ export const createBill = asyncHandler(async (req, res) => {
   const result = await withTransaction(async (client) => {
     const existingBill = await client.query(
       "SELECT id, bill_number, total_amount FROM bills WHERE idempotency_key = $1",
-      [idempotency_key],
+      [idempotency_key]
     );
 
     if (existingBill.rows.length) {
@@ -63,6 +59,13 @@ export const createBill = asyncHandler(async (req, res) => {
       "INSERT INTO bills (bill_number, total_amount, payment_method, idempotency_key, created_by, payment_status) VALUES ($1, $2, $3, $4, $5, 'PAID') RETURNING *",
       [billNumber, totalAmount, payment_method, idempotency_key, user_id],
     );
+
+    await logBillEvent({
+      client,
+      bill_id: billRes.rows[0].id,
+      eventType: "CREATED",
+      performedBy: user_id,
+    });
 
     const billId = billRes.rows[0].id;
 
@@ -110,6 +113,7 @@ export const createBill = asyncHandler(async (req, res) => {
 export const getBillById = asyncHandler(async (req, res) => {
   const { bill_id } = req.params;
   const { limit = 10, page = 1 } = req.query;
+  console.log(bill_id)
 
   const { rows } = await pool.query(
     `SELECT
@@ -167,20 +171,31 @@ export const getAllBills = asyncHandler(async (req, res) => {
     sort_order = "DESC",
   } = req.query;
 
-  // const allowedSortColumns = ["bill_number", "total_amount", "payment_method", "created_at", "id"];
-  // const allowedSortOrders = ["ASC", "DESC"];
+  const parsedLimit = parseInt(limit);
+  const parsedPage = parseInt(page);
+  const offset = (parsedPage - 1) * parsedLimit;
 
-  // const validSortBy = allowedSortColumns.includes(sort_by) ? sort_by : "created_at";
-  // const validSortOrder = allowedSortOrders.includes(sort_order.toUpperCase()) ? sort_order.toUpperCase() : "DESC";
+  // Get total count
+  const countRes = await pool.query("SELECT COUNT(*) FROM bills");
+  const total = parseInt(countRes.rows[0].count);
+  const totalPages = Math.ceil(total / parsedLimit);
 
   const { rows } = await pool.query(
     `SELECT * FROM bills ORDER BY ${sort_by} ${sort_order} LIMIT $1 OFFSET $2`,
-    [limit, (page - 1) * limit],
+    [parsedLimit, offset],
   );
 
   res.json(
     getSuccessResponse({
-      data: rows,
+      data: {
+        bills: rows,
+        meta: {
+          total,
+          totalPages,
+          page: parsedPage,
+          limit: parsedLimit
+        }
+      },
       message: "Bills fetched successfully",
       status: 200,
     }),
@@ -188,13 +203,13 @@ export const getAllBills = asyncHandler(async (req, res) => {
 });
 
 export const voidBill = asyncHandler(async (req, res) => {
-  const { billId } = req.params;
+  const { bill_id } = req.params;
   const { user_id } = req.user;
 
   const result = await withTransaction(async (client) => {
     const billRes = await client.query(
       "SELECT * FROM bills WHERE id = $1 FOR UPDATE",
-      [billId],
+      [bill_id],
     );
 
     if (!billRes.rows.length) throw createHttpError(404, "Bill not found");
@@ -205,19 +220,20 @@ export const voidBill = asyncHandler(async (req, res) => {
       throw createHttpError(409, "Bill already voided");
     }
 
-    if (bill.settled) throw createHttpError(409, "Bill already settled");
+    if (bill.settled)
+      throw createHttpError(409, "Cannot void a settled bill");
 
     if (Number(bill.returned_amount) > 0)
       throw createHttpError(409, "Cannot void bill with returns");
 
-    if (await hasRefunds(client, billId))
+    if (await hasRefunds(client, bill_id))
       throw createHttpError(409, "Cannot void bill with refunds");
 
     const reference = `VOID-BILL-${bill.bill_number}`;
 
     const billItems = await client.query(
       "SELECT product_id, quantity FROM bill_items WHERE bill_id = $1 FOR UPDATE",
-      [billId],
+      [bill_id],
     );
 
     for (const item of billItems.rows) {
@@ -232,15 +248,25 @@ export const voidBill = asyncHandler(async (req, res) => {
       );
     }
 
-    await client.query(
-      "UPDATE bills SET is_void = TRUE, voided_at = NOW(), void_by = $1 WHERE id = $2",
-      [user_id, billId],
-    );
+    await client.query("UPDATE bills SET is_void = TRUE, voided_at = NOW(), void_by = $1 WHERE id = $2", [
+      user_id,
+      bill_id,
+    ]);
+
+    console.log(bill_id)
+
+    await logBillEvent({
+      client,
+      bill_id: bill_id,
+      eventType: "VOIDED",
+      performedBy: user_id,
+    });
 
     return {
-      bill_id: billId,
+      bill_id: bill_id,
       voided: true,
     };
+
   });
 
   res.json(
@@ -253,8 +279,8 @@ export const voidBill = asyncHandler(async (req, res) => {
 });
 
 export const createReturn = asyncHandler(async (req, res) => {
-  const { billId } = req.params;
-  const { items, reason } = req.body;
+  const { bill_id } = req.params;
+  const { items, reason, payment_method, idempotency_key } = req.body;
   const { user_id } = req.user;
 
   if (!items?.length) {
@@ -264,10 +290,11 @@ export const createReturn = asyncHandler(async (req, res) => {
   const result = await withTransaction(async (client) => {
     const billRes = await client.query(
       "SELECT * FROM bills WHERE id = $1 FOR UPDATE",
-      [billId],
+      [bill_id]
     );
 
-    if (!billRes.rows.length) throw createHttpError(404, "Bill not found");
+    if (!billRes.rows.length)
+      throw createHttpError(404, "Bill not found");
 
     const bill = billRes.rows[0];
 
@@ -276,22 +303,23 @@ export const createReturn = asyncHandler(async (req, res) => {
 
     const billItemsRes = await client.query(
       "SELECT product_id, quantity, price FROM bill_items WHERE bill_id = $1",
-      [billId],
+      [bill_id]
     );
 
     const billItemMap = new Map();
-    billItemsRes.rows.forEach((item) => {
+    billItemsRes.rows.forEach(item => {
       billItemMap.set(item.product_id, item);
     });
 
-    const returnedQtyMap = await getReturnedQtyMap(client, billId);
+    const returnedQtyMap = await getReturnedQtyMap(client, bill_id);
 
     let totalReturnAmount = 0;
 
     for (const item of items) {
       const billItem = billItemMap.get(item.product_id);
 
-      if (!billItem) throw createHttpError(400, "Product not part of bill");
+      if (!billItem)
+        throw createHttpError(400, "Product not part of bill");
 
       const alreadyReturned = returnedQtyMap.get(item.product_id) || 0;
       const remainingQty = billItem.quantity - alreadyReturned;
@@ -305,11 +333,11 @@ export const createReturn = asyncHandler(async (req, res) => {
     /** Create return */
     const returnRes = await client.query(
       `
-      INSERT INTO returns (bill_id, total_return_amount, reason, return_by)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO returns (bill_id, total_return_amount, reason, return_by, payment_method, idempotency_key)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
       `,
-      [billId, totalReturnAmount, reason, user_id],
+      [bill_id, totalReturnAmount, reason, user_id, payment_method, idempotency_key]
     );
 
     const returnId = returnRes.rows[0].id;
@@ -326,12 +354,12 @@ export const createReturn = asyncHandler(async (req, res) => {
         (return_id, product_id, quantity, price, line_total)
         VALUES ($1, $2, $3, $4, $5)
         `,
-        [returnId, item.product_id, item.quantity, billItem.price, lineTotal],
+        [returnId, item.product_id, item.quantity, billItem.price, lineTotal]
       );
 
       await client.query(
         "UPDATE products SET stock_qty = stock_qty + $1 WHERE id = $2",
-        [item.quantity, item.product_id],
+        [item.quantity, item.product_id]
       );
 
       await client.query(
@@ -340,7 +368,7 @@ export const createReturn = asyncHandler(async (req, res) => {
         (product_id, quantity, movement_type, reference, created_by)
         VALUES ($1, $2, 'IN', $3, $4)
         `,
-        [item.product_id, item.quantity, reference, user_id],
+        [item.product_id, item.quantity, reference, user_id]
       );
     }
 
@@ -351,8 +379,18 @@ export const createReturn = asyncHandler(async (req, res) => {
       SET returned_amount = returned_amount + $1
       WHERE id = $2
       `,
-      [totalReturnAmount, billId],
+      [totalReturnAmount, bill_id]
     );
+
+    await logBillEvent({
+      client,
+      bill_id,
+      eventType: "RETURNED",
+      performedBy: user_id,
+      metadata: {
+        items: items,
+      },
+    });
 
     return returnRes.rows[0];
   });
@@ -361,13 +399,13 @@ export const createReturn = asyncHandler(async (req, res) => {
     getSuccessResponse({
       data: result,
       message: "Return processed successfully",
-      status: 201,
-    }),
+      status: 201
+    })
   );
-});
+})
 
 export const createRefund = asyncHandler(async (req, res) => {
-  const { billId } = req.params;
+  const { bill_id } = req.params;
   const { amount, payment_method, reason } = req.body;
   const { user_id } = req.user;
 
@@ -377,25 +415,29 @@ export const createRefund = asyncHandler(async (req, res) => {
   const result = await withTransaction(async (client) => {
     const billRes = await client.query(
       "SELECT * FROM bills WHERE id = $1 FOR UPDATE",
-      [billId],
+      [bill_id]
     );
 
-    if (!billRes.rows.length) throw createHttpError(404, "Bill not found");
+    if (!billRes.rows.length)
+      throw createHttpError(404, "Bill not found");
 
     const bill = billRes.rows[0];
 
-    if (bill.is_void) throw createHttpError(409, "Cannot refund a void bill");
+    if (bill.is_void)
+      throw createHttpError(409, "Cannot refund a void bill");
 
-    if (bill.settled) throw createHttpError(409, "Bill already settled");
+    if (bill.settled)
+      throw createHttpError(409, "Bill already settled");
 
     /** Calculate remaining refundable amount */
-    const refundedSoFar = await getRefundedAmount(client, billId);
+    const refundedSoFar = await getRefundedAmount(client, bill_id);
 
     const maxRefundable =
       Number(bill.total_amount) - Number(bill.returned_amount) - refundedSoFar;
 
     if (amount > maxRefundable)
       throw createHttpError(409, "Refund amount exceeds refundable balance");
+
 
     /** Create refund */
     const refundRes = await client.query(
@@ -404,7 +446,7 @@ export const createRefund = asyncHandler(async (req, res) => {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
       `,
-      [billId, amount, payment_method, reason, user_id],
+      [bill_id, amount, payment_method, reason, user_id]
     );
 
     /** Update bill payment status */
@@ -417,8 +459,20 @@ export const createRefund = asyncHandler(async (req, res) => {
       SET payment_status = $1
       WHERE id = $2
       `,
-      [newStatus, billId],
+      [newStatus, bill_id]
     );
+
+    await logBillEvent({
+      client,
+      bill_id,
+      eventType: "REFUNDED",
+      performedBy: user_id,
+      metadata: {
+        amount: amount,
+        method: payment_method,
+        reason,
+      },
+    });
 
     return refundRes.rows[0];
   });
@@ -427,11 +481,129 @@ export const createRefund = asyncHandler(async (req, res) => {
     getSuccessResponse({
       data: result,
       message: "Refund processed successfully",
-      status: 201,
-    }),
+      status: 201
+    })
+  );
+})
+
+export const settleDay = asyncHandler(async (req, res) => {
+  const { user_id } = req.user;
+  const settlementDate = req.body.date;
+
+  if (!settlementDate) {
+    throw createHttpError(400, "settlement date is required");
+  }
+
+  const settlement = await withTransaction(async (client) => {
+    /* Prevent double settlement */
+    const exists = await client.query(
+      `SELECT 1 FROM settlements WHERE settlement_date = $1`,
+      [settlementDate]
+    );
+
+    if (exists.rowCount > 0) {
+      throw createHttpError(409, "Day already settled");
+    }
+
+    /* Fetch bills */
+    const billsRes = await client.query(
+      `
+      SELECT id, total_amount
+      FROM bills
+      WHERE settled = false
+        AND is_void = false
+        AND created_at::date = $1
+      FOR UPDATE
+      `,
+      [settlementDate]
+    );
+
+    if (billsRes.rowCount === 0) {
+      throw createHttpError(409, "No bills to settle");
+    }
+
+    const billIds = billsRes.rows.map(b => b.id);
+
+    /* Net amount (SOURCE OF TRUTH) */
+    const netAmount = billsRes.rows.reduce(
+      (sum, b) => sum + Number(b.total_amount),
+      0
+    );
+
+    /* Create settlement */
+    const settlementRes = await client.query(
+      `
+      INSERT INTO settlements (
+        settlement_date,
+        net_amount,
+        bills_count,
+        settled_by
+      )
+      VALUES ($1,$2,$3,$4)
+      RETURNING *
+      `,
+      [
+        settlementDate,
+        netAmount,
+        billIds.length,
+        user_id,
+      ]
+    );
+
+    /* Mark bills settled */
+    await client.query(
+      `
+      UPDATE bills
+      SET settled = true
+      WHERE id = ANY($1)
+      `,
+      [billIds]
+    );
+
+    return settlementRes.rows[0];
+  });
+
+  res.status(200).json(
+    getSuccessResponse({
+      data: settlement,
+      message: "Day settled successfully",
+      status: 200,
+    })
   );
 });
 
-export const settleDay = asyncHandler(async (req, res) => {
-  const { date } = req.params;
+export const getBillsHistory = asyncHandler(async (req, res) => {
+  const { user_id } = req.user;
+
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  const bills = await withTransaction(async (client) => {
+    const billsRes = await client.query(
+      `
+      SELECT *
+      FROM bills
+      WHERE created_by = $1
+        AND created_at::date = CURRENT_DATE
+      ORDER BY created_at DESC
+      LIMIT $2 OFFSET $3
+      `,
+      [user_id, limit, offset]
+    );
+
+    return billsRes.rows;
+  });
+
+  res.status(200).json(
+    getSuccessResponse({
+      data: {
+        page,
+        limit,
+        bills,
+      },
+      message: "Bills history fetched successfully",
+      status: 200,
+    })
+  );
 });

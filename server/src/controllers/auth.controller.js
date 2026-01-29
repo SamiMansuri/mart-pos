@@ -34,7 +34,7 @@ export const login = asyncHandler(async (req, res) => {
 
   res.json(
     getSuccessResponse({
-      data: token,
+      data: { auth_token: token },
       message: "Login successful",
       status: 200,
     }),
