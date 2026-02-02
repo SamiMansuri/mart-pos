@@ -3,9 +3,11 @@ import createHttpError from "http-errors";
 import pool from "../config/db.config.js";
 import { getSuccessResponse } from "../utils/response.util.js";
 import { hashPassword } from "../utils/password.js";
+import { logEvent } from "../services/logs.service.js";
 
 export const createUser = asyncHandler(async (req, res) => {
   const { name, role, password, user_name } = req.body;
+  const { user_id } = req.user;
 
   if (!name || !user_name || !password || !role) {
     throw createHttpError(400, "All fields required");
@@ -20,8 +22,10 @@ export const createUser = asyncHandler(async (req, res) => {
     `INSERT INTO users (name, user_name, password, role)
       VALUES ($1, $2, $3, $4)
       RETURNING id, name, user_name, role`,
-    [name, user_name, passwordHash, role]
+    [name, user_name, passwordHash, role],
   );
+
+  await logEvent(pool, "USER_CREATED", user_id, "USER", result.rows[0].id);
   res.json(
     getSuccessResponse({
       data: result.rows[0],
@@ -34,8 +38,9 @@ export const createUser = asyncHandler(async (req, res) => {
 export const getAllUsers = asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT id, name, user_name, role
-      FROM users`
+      FROM users`,
   );
+
   res.json(
     getSuccessResponse({
       data: result.rows,
@@ -44,4 +49,3 @@ export const getAllUsers = asyncHandler(async (req, res) => {
     }),
   );
 });
-

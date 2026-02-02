@@ -12,6 +12,8 @@ import ProductsList from './pages/ProductsList';
 import UpdateProduct from './pages/UpdateProduct';
 import CreateEmployee from './pages/CreateEmployee';
 import EmployeeList from './pages/EmployeeList';
+import ReturnBill from './pages/ReturnBill';
+import AdminBillDetails from './pages/AdminBillDetails';
 import { getUserInfo, isTokenExpired } from './utils/auth.utils';
 
 // Guard for authenticated sessions
@@ -69,6 +71,11 @@ function App() {
               <CashierDashboard />
             </RoleGuard>
           } />
+          <Route path="cashier/return" element={
+            <RoleGuard allowedRoles={['cashier', 'admin']}>
+              <ReturnBill />
+            </RoleGuard>
+          } />
           <Route path="bills/create" element={
             <RoleGuard allowedRoles={['cashier', 'admin']}>
               <CreateBill />
@@ -114,6 +121,11 @@ function App() {
           <Route path="bills" element={
             <RoleGuard allowedRoles={['admin']}>
               <BillsList />
+            </RoleGuard>
+          } />
+          <Route path="admin/bills/:billId" element={
+            <RoleGuard allowedRoles={['admin']}>
+              <AdminBillDetails />
             </RoleGuard>
           } />
 

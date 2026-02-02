@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { productsApi, billsApi } from "../api/api";
 import {
   Box,
@@ -33,38 +34,120 @@ import {
   QrCode2 as UpiIcon,
 } from "@mui/icons-material";
 
-const ProductCard = React.memo(({ product, onAdd }) => (
-  <Grid item xs={12} sm={6} md={4}>
-    <Card>
-      <CardContent>
-        <Typography
-          variant="h6"
-          gutterBottom
+const ProductCard = React.memo(({ product, onAdd }) => {
+  const isOutOfStock = product.stock_qty <= 0;
+  const isLowStock = product.stock_qty < 10 && !isOutOfStock;
+
+  return (
+    <Grid item xs={6} sm={6} md={4} lg={3} sx={{ display: "flex" }}>
+      <Card
+        elevation={1}
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          width: "100%",
+          borderRadius: 2,
+          overflow: "hidden",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          border: "1px solid",
+          borderColor: "divider",
+          "&:hover": {
+            transform: "translateY(-4px)",
+            boxShadow: "0 12px 20px -10px rgba(0,0,0,0.1)",
+            borderColor: "primary.light",
+          },
+        }}
+      >
+        <CardContent
           sx={{
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            flex: "1 0 auto",
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {product.name}
-        </Typography>
-        <Typography variant="h5" color="primary" fontWeight={700}>
-          ₹{parseFloat(product.selling_price).toFixed(2)}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Stock: {product.stock_qty}
-        </Typography>
-      </CardContent>
-      <CardActions>
-        <Button fullWidth variant="contained" onClick={() => onAdd(product)}>
-          Add to Cart
-        </Button>
-      </CardActions>
-    </Card>
-  </Grid>
-));
+          <Typography
+            variant="subtitle1"
+            sx={{
+              fontWeight: 700,
+              fontSize: "0.95rem",
+              lineHeight: 1.3,
+              height: "2.6rem", // Exactly 2 lines of text
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              mb: 1,
+            }}
+          >
+            {product.name}
+          </Typography>
+
+          <Box sx={{ mt: "auto" }}>
+            <Typography
+              variant="h6"
+              color="primary.main"
+              fontWeight={800}
+              sx={{ mb: 0.5 }}
+            >
+              ${parseFloat(product.selling_price).toFixed(2)}
+            </Typography>
+
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                minHeight: "1.5rem",
+              }}
+            >
+              {isOutOfStock ? (
+                <Typography
+                  variant="caption"
+                  color="error.main"
+                  fontWeight={800}
+                  sx={{ letterSpacing: "0.5px" }}
+                >
+                  OUT OF STOCK
+                </Typography>
+              ) : (
+                <Typography
+                  variant="caption"
+                  color={isLowStock ? "error.main" : "text.secondary"}
+                  fontWeight={isLowStock ? 700 : 500}
+                >
+                  Stock: {product.stock_qty}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </CardContent>
+        <CardActions sx={{ p: 2, pt: 0 }}>
+          <Button
+            fullWidth
+            variant={isOutOfStock ? "outlined" : "contained"}
+            onClick={() => onAdd(product)}
+            disabled={isOutOfStock}
+            color={isOutOfStock ? "inherit" : "primary"}
+            disableElevation
+            sx={{
+              py: 1,
+              fontWeight: 700,
+              borderRadius: 1.5,
+              textTransform: "none",
+              fontSize: "0.875rem",
+            }}
+          >
+            {isOutOfStock ? "Unavailable" : "Add to Cart"}
+          </Button>
+        </CardActions>
+      </Card>
+    </Grid>
+  );
+});
 
 const CashierDashboard = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -78,6 +161,45 @@ const CashierDashboard = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantityInput, setQuantityInput] = useState("");
   const quantityInputRef = useRef(null);
+
+  const addToCart = useCallback((product) => {
+    setSelectedProduct(product);
+    setQuantityInput("");
+    setQuantityDialogOpen(true);
+  }, []);
+
+  const fetchProducts = useCallback(
+    async (term) => {
+      if (!term.trim()) {
+        setProducts([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const response = await productsApi.getAll(1, 100, term);
+        const fetchedProducts = response.products || [];
+        setProducts(fetchedProducts);
+
+        // Check if the search term matches any product's barcode exactly
+        const exactBarcodeMatch = fetchedProducts.find(
+          (p) => p.barcode && p.barcode.trim() === term.trim(),
+        );
+
+        if (exactBarcodeMatch) {
+          // Auto-open quantity modal for exact barcode match
+          addToCart(exactBarcodeMatch);
+          // Clear search to prepare for next scan
+          setSearchTerm("");
+          setProducts([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch products", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [addToCart],
+  );
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -107,25 +229,7 @@ const CashierDashboard = () => {
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-
-  const fetchProducts = async (term) => {
-    setLoading(true);
-    try {
-      const response = await productsApi.getAll(1, 100, term);
-      setProducts(response.products || []);
-    } catch (err) {
-      console.error("Failed to fetch products", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addToCart = useCallback((product) => {
-    setSelectedProduct(product);
-    setQuantityInput("");
-    setQuantityDialogOpen(true);
-  }, []);
+  }, [searchTerm, fetchProducts]);
 
   const handleQuantityDialogClose = useCallback(() => {
     setQuantityDialogOpen(false);
@@ -193,6 +297,7 @@ const CashierDashboard = () => {
         items,
         payment_method: paymentMethod,
         idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        business_date: new Date().toISOString().split("T")[0],
       });
       setStatus({
         type: "success",
@@ -221,9 +326,26 @@ const CashierDashboard = () => {
         >
           Cashier Terminal
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Select products to add to cart
-        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            Select products to add to cart
+          </Typography>
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<RemoveIcon />}
+            onClick={() => navigate("/cashier/return")}
+            sx={{ fontWeight: 700, borderRadius: 2 }}
+          >
+            Manage Returns
+          </Button>
+        </Box>
       </Box>
 
       <Box
@@ -236,12 +358,28 @@ const CashierDashboard = () => {
       >
         {/* Product Section */}
         <Box sx={{ flex: 1, minWidth: { xs: "100%", lg: 600 }, width: "100%" }}>
-          <Paper sx={{ p: 3, mb: 3 }}>
+          <Paper
+            sx={{
+              p: { xs: 2, sm: 3 },
+              mb: 3,
+              position: { xs: "sticky", sm: "static" },
+              top: { xs: 70, sm: "auto" },
+              zIndex: 10,
+              boxShadow: { xs: 3, sm: 1 },
+            }}
+          >
             <TextField
               fullWidth
               placeholder="Search products..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && searchTerm.trim()) {
+                  // Trigger immediate search on Enter (useful for barcode scanners)
+                  fetchProducts(searchTerm);
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -296,7 +434,7 @@ const CashierDashboard = () => {
             top: { lg: 80 },
           }}
         >
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 } }}>
             <Box
               sx={{
                 display: "flex",

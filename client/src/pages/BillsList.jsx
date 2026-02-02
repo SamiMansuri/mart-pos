@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { billsApi } from "../api/api";
 import {
   Box,
@@ -27,6 +27,7 @@ import {
 } from "@mui/icons-material";
 
 const BillsList = () => {
+  const navigate = useNavigate();
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -281,7 +282,10 @@ const BillsList = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleMenuClose}>View Details</MenuItem>
+        <MenuItem onClick={() => {
+          navigate(`/admin/bills/${selectedBill.id}`);
+          handleMenuClose();
+        }}>View Details</MenuItem>
         <MenuItem onClick={handleMenuClose}>Print</MenuItem>
         {selectedBill && !selectedBill.is_void && (
           <MenuItem onClick={handleVoid} sx={{ color: "error.main" }}>

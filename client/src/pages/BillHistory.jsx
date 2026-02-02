@@ -34,15 +34,7 @@ const BillHistory = () => {
     try {
       const response = await billsApi.getBillsHistory(page, limit);
       setBills(response.bills || []);
-
-      // Calculate total pages based on returned bills
-      // If we get less than limit, we're on the last page
-      if (response.bills.length < limit) {
-        setTotalPages(page);
-      } else {
-        // Optimistically assume there might be more
-        setTotalPages(page + 1);
-      }
+      setTotalPages(response.meta?.totalPages || 1);
     } catch (err) {
       setError(err.message || "Failed to fetch bill history");
       setBills([]);
@@ -55,8 +47,11 @@ const BillHistory = () => {
     setPage(value);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleTimeString("en-US", {
+  const formatDateTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
@@ -97,10 +92,10 @@ const BillHistory = () => {
           gutterBottom
           sx={{ fontSize: { xs: "1.75rem", sm: "2.125rem" } }}
         >
-          Today's Bill History
+          Bill History
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          View all bills you've created today
+          View all bills you've created
         </Typography>
       </Box>
 
@@ -113,7 +108,7 @@ const BillHistory = () => {
       {bills.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: "center" }}>
           <Typography variant="h6" color="text.secondary">
-            No bills created today
+            No bills found
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             Bills you create will appear here
@@ -185,7 +180,7 @@ const BillHistory = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {formatDate(bill.created_at)}
+                        {formatDateTime(bill.created_at)}
                       </Typography>
                     </TableCell>
                   </TableRow>

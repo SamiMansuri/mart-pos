@@ -27,6 +27,7 @@ import {
   Menu as MenuIcon,
 } from "@mui/icons-material";
 import { isAdmin } from "../utils/auth.utils";
+import { authApi } from "../api/api";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -37,9 +38,15 @@ const Layout = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (err) {
+      console.error("Server-side logout failed:", err);
+    } finally {
+      localStorage.removeItem("token");
+      navigate("/login");
+    }
   };
 
   const getCurrentTab = () => {
@@ -83,7 +90,7 @@ const Layout = () => {
       >
         <StoreIcon sx={{ fontSize: 28, color: "primary.main" }} />
         <Typography variant="h6" fontWeight={700} color="primary">
-          MiniMart POS
+          Family Mart POS
         </Typography>
       </Box>
       <Divider />
@@ -164,13 +171,13 @@ const Layout = () => {
                 component="span"
                 sx={{ display: { xs: "none", sm: "inline" } }}
               >
-                MiniMart POS
+                Family Mart POS
               </Box>
               <Box
                 component="span"
                 sx={{ display: { xs: "inline", sm: "none" } }}
               >
-                MiniMart
+                Family Mart
               </Box>
             </Typography>
           </Box>
@@ -229,7 +236,7 @@ const Layout = () => {
         maxWidth="xl"
         sx={{
           flexGrow: 1,
-          py: 4,
+          py: { xs: 2, sm: 4 },
           display: "flex",
           flexDirection: "column",
         }}
@@ -250,7 +257,7 @@ const Layout = () => {
       >
         <Container maxWidth="xl">
           <Typography variant="body2" color="text.secondary" align="center">
-            © {new Date().getFullYear()} MiniMart. All rights reserved.
+            © {new Date().getFullYear()} Family Mart. All rights reserved.
           </Typography>
         </Container>
       </Box>

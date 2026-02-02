@@ -49,6 +49,7 @@ export const billsApi = {
   getAll: (page = 1, limit = 10) =>
     apiFetch(`/bills?page=${page}&limit=${limit}`),
   getById: (id) => apiFetch(`/bills/${id}`),
+  getDetails: (id) => apiFetch(`/bills/${id}/details`),
   deleteBill: (id) =>
     apiFetch(`/bills/${id}`, {
       method: "DELETE",
@@ -66,6 +67,18 @@ export const billsApi = {
       method: "POST",
       body: JSON.stringify(refundData),
     }),
+  createReturn: (id, returnData) =>
+    apiFetch(`/bills/${id}/return`, {
+      method: "POST",
+      body: JSON.stringify(returnData),
+    }),
+  search: (params) => {
+    let url = "/bills/search?";
+    if (params.bill_number) url += `bill_number=${params.bill_number}`;
+    else if (params.business_date && params.invoice_number)
+      url += `business_date=${params.business_date}&invoice_number=${params.invoice_number}`;
+    return apiFetch(url);
+  },
 };
 
 export const productsApi = {
@@ -92,6 +105,10 @@ export const authApi = {
     apiFetch("/auth/login", {
       method: "POST",
       body: JSON.stringify(credentials),
+    }),
+  logout: () =>
+    apiFetch("/auth/logout", {
+      method: "POST",
     }),
 };
 
