@@ -1,5 +1,5 @@
-import { useNavigate, useLocation } from "react-router-dom";
-import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 
 import {
   Box,
@@ -18,17 +18,19 @@ import {
   IconButton,
   InputAdornment,
   TextField,
-} from "@mui/material";
+} from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Search as SearchIcon,
-} from "@mui/icons-material";
-import { productsApi } from "../api/api";
+} from '@mui/icons-material';
+import { productsApi } from '../api/api';
+import { isAdmin as checkAdmin } from '../utils/auth.utils';
 
 const ProductsList = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isAdminUser = checkAdmin();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,8 +38,8 @@ const ProductsList = () => {
   // Initialize page from location state if returning from edit
   const [page, setPage] = useState(location.state?.page || 1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const limit = 10;
 
   // Handle search debouncing
@@ -61,8 +63,8 @@ const ProductsList = () => {
       setProducts(response.products || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (err) {
-      console.error("Failed to fetch products:", err);
-      setError(err.message || "Failed to fetch products");
+      console.error('Failed to fetch products:', err);
+      setError(err.message || 'Failed to fetch products');
     } finally {
       setLoading(false);
     }
@@ -78,9 +80,9 @@ const ProductsList = () => {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
     });
   };
 
@@ -89,11 +91,11 @@ const ProductsList = () => {
       <Box
         sx={{
           mb: 4,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
           gap: 2,
-          flexWrap: "wrap",
+          flexWrap: 'wrap',
         }}
       >
         <Box>
@@ -107,11 +109,11 @@ const ProductsList = () => {
 
         <Box
           sx={{
-            display: "flex",
+            display: 'flex',
             gap: 2,
-            alignItems: "center",
-            flexWrap: "wrap",
-            width: { xs: "100%", md: "auto" },
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            width: { xs: '100%', md: 'auto' },
           }}
         >
           <TextField
@@ -121,8 +123,8 @@ const ProductsList = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             sx={{
               flexGrow: { xs: 1, md: 0 },
-              maxWidth: { xs: "100%", md: 350 },
-              bgcolor: "background.paper",
+              maxWidth: { xs: '100%', md: 350 },
+              bgcolor: 'background.paper',
             }}
             InputProps={{
               startAdornment: (
@@ -135,20 +137,20 @@ const ProductsList = () => {
           <Button
             variant="contained"
             startIcon={
-              <AddIcon sx={{ display: { xs: "none", sm: "inline-flex" } }} />
+              <AddIcon sx={{ display: { xs: 'none', sm: 'inline-flex' } }} />
             }
-            onClick={() => navigate("/admin/products/add")}
-            sx={{ whiteSpace: "nowrap", width: { xs: "100%", md: "auto" } }}
+            onClick={() => navigate('/admin/products/add')}
+            sx={{ whiteSpace: 'nowrap', width: { xs: '100%', md: 'auto' } }}
           >
             <Box
               component="span"
-              sx={{ display: { xs: "none", sm: "inline" } }}
+              sx={{ display: { xs: 'none', sm: 'inline' } }}
             >
               Add Product
             </Box>
             <Box
               component="span"
-              sx={{ display: { xs: "inline", sm: "none" } }}
+              sx={{ display: { xs: 'inline', sm: 'none' } }}
             >
               Add
             </Box>
@@ -163,25 +165,25 @@ const ProductsList = () => {
       )}
 
       {loading && products.length === 0 ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
         </Box>
       ) : products.length === 0 ? (
-        <Paper sx={{ p: 6, textAlign: "center" }}>
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
             No products found
           </Typography>
           <Button
             variant="outlined"
             sx={{ mt: 2 }}
-            onClick={() => navigate("/admin/products/add")}
+            onClick={() => navigate('/admin/products/add')}
           >
             Add your first product
           </Button>
         </Paper>
       ) : (
         <>
-          <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
             <Table sx={{ minWidth: 800 }}>
               <TableHead>
                 <TableRow>
@@ -195,11 +197,13 @@ const ProductsList = () => {
                       Barcode
                     </Typography>
                   </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="subtitle2" fontWeight={700}>
-                      Cost Price
-                    </Typography>
-                  </TableCell>
+                  {isAdminUser && (
+                    <TableCell align="right">
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        Cost Price
+                      </Typography>
+                    </TableCell>
+                  )}
                   <TableCell align="right">
                     <Typography variant="subtitle2" fontWeight={700}>
                       Selling Price
@@ -232,14 +236,16 @@ const ProductsList = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {product.barcode || "-"}
+                        {product.barcode || '-'}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2">
-                        {formatCurrency(product.cost_price)}
-                      </Typography>
-                    </TableCell>
+                    {isAdminUser && (
+                      <TableCell align="right">
+                        <Typography variant="body2">
+                          {formatCurrency(product.cost_price)}
+                        </Typography>
+                      </TableCell>
+                    )}
                     <TableCell align="right">
                       <Typography
                         variant="body2"
@@ -254,7 +260,7 @@ const ProductsList = () => {
                         variant="body2"
                         fontWeight={600}
                         color={
-                          product.stock_qty < 10 ? "error.main" : "text.primary"
+                          product.stock_qty < 10 ? 'error.main' : 'text.primary'
                         }
                       >
                         {product.stock_qty}
@@ -285,7 +291,7 @@ const ProductsList = () => {
           </TableContainer>
 
           {totalPages > 1 && (
-            <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
               <Pagination
                 count={totalPages}
                 page={page}

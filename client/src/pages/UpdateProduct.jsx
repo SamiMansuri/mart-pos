@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -11,9 +11,9 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
-} from "@mui/material";
-import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
-import { productsApi } from "../api/api";
+} from '@mui/material';
+import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { productsApi } from '../api/api';
 
 const UpdateProduct = () => {
   const { id } = useParams();
@@ -21,13 +21,15 @@ const UpdateProduct = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [status, setStatus] = useState({ type: "", message: "" });
+  const [status, setStatus] = useState({ type: '', message: '' });
   const [formData, setFormData] = useState({
-    product_name: "",
-    barcode: "",
-    cost_price: "",
-    selling_price: "",
-    stock_qty: "",
+    product_name: '',
+    barcode: '',
+    cost_price: '',
+    selling_price: '',
+    stock_qty: '',
+    batch_no: '',
+    expiry_date: '',
   });
 
   // Capture the return page from location state
@@ -41,17 +43,21 @@ const UpdateProduct = () => {
     try {
       const product = await productsApi.getById(id);
       setFormData({
-        product_name: product.name || "",
-        barcode: product.barcode || "",
-        cost_price: product.cost_price || "",
-        selling_price: product.selling_price || "",
-        stock_qty: product.stock_qty || "",
+        product_name: product.name || '',
+        barcode: product.barcode || '',
+        cost_price: product.cost_price || '',
+        selling_price: product.selling_price || '',
+        stock_qty: product.stock_qty || '',
+        batch_no: product.batch_no || 'INITIAL',
+        expiry_date: product.expiry_date
+          ? product.expiry_date.split('T')[0]
+          : '',
       });
     } catch (err) {
-      console.error("Failed to fetch product details:", err);
+      console.error('Failed to fetch product details:', err);
       setStatus({
-        type: "error",
-        message: err.message || "Failed to load product details",
+        type: 'error',
+        message: err.message || 'Failed to load product details',
       });
     } finally {
       setLoading(false);
@@ -67,7 +73,7 @@ const UpdateProduct = () => {
   };
 
   const handleBack = () => {
-    navigate("/admin/products", { state: { page: returnPage } });
+    navigate('/admin/products', { state: { page: returnPage } });
   };
 
   const handleSubmit = async (e) => {
@@ -80,14 +86,14 @@ const UpdateProduct = () => {
       !formData.stock_qty
     ) {
       setStatus({
-        type: "error",
-        message: "Please fill in all required fields",
+        type: 'error',
+        message: 'Please fill in all required fields',
       });
       return;
     }
 
     setSubmitting(true);
-    setStatus({ type: "", message: "" });
+    setStatus({ type: '', message: '' });
 
     try {
       await productsApi.update(id, {
@@ -98,18 +104,18 @@ const UpdateProduct = () => {
       });
 
       setStatus({
-        type: "success",
-        message: "Product updated successfully! Redirecting...",
+        type: 'success',
+        message: 'Product updated successfully! Redirecting...',
       });
 
       setTimeout(() => {
         handleBack();
       }, 1000);
     } catch (err) {
-      console.error("Failed to update product:", err);
+      console.error('Failed to update product:', err);
       setStatus({
-        type: "error",
-        message: err.message || "Failed to update product. Please try again.",
+        type: 'error',
+        message: err.message || 'Failed to update product. Please try again.',
       });
     } finally {
       setSubmitting(false);
@@ -118,21 +124,21 @@ const UpdateProduct = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 800, mx: "auto" }}>
+    <Box sx={{ maxWidth: 800, mx: 'auto' }}>
       <Box
         sx={{
           mb: 4,
-          display: "flex",
-          alignItems: "center",
+          display: 'flex',
+          alignItems: 'center',
           gap: 2,
-          flexWrap: "wrap",
+          flexWrap: 'wrap',
         }}
       >
         <IconButton onClick={handleBack} color="primary">
@@ -192,7 +198,7 @@ const UpdateProduct = () => {
                     <InputAdornment position="start">₹</InputAdornment>
                   ),
                 }}
-                inputProps={{ step: "0.01", min: "0" }}
+                inputProps={{ step: '0.01', min: '0' }}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
@@ -209,7 +215,7 @@ const UpdateProduct = () => {
                     <InputAdornment position="start">₹</InputAdornment>
                   ),
                 }}
-                inputProps={{ step: "0.01", min: "0" }}
+                inputProps={{ step: '0.01', min: '0' }}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
@@ -221,24 +227,46 @@ const UpdateProduct = () => {
                 value={formData.stock_qty}
                 onChange={handleChange}
                 required
-                inputProps={{ min: "0" }}
+                inputProps={{ min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Batch Number"
+                name="batch_no"
+                value={formData.batch_no}
+                onChange={handleChange}
+                onFocus={(e) => e.target.select()}
+                placeholder="INITIAL"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Expiry Date"
+                name="expiry_date"
+                type="date"
+                value={formData.expiry_date}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Box
                 sx={{
-                  display: "flex",
+                  display: 'flex',
                   gap: 2,
-                  justifyContent: "flex-end",
-                  flexWrap: "wrap",
+                  justifyContent: 'flex-end',
+                  flexWrap: 'wrap',
                 }}
               >
                 <Button
                   variant="outlined"
                   onClick={handleBack}
                   disabled={submitting}
-                  sx={{ minWidth: { xs: "100%", sm: 120 } }}
+                  sx={{ minWidth: { xs: '100%', sm: 120 } }}
                 >
                   Cancel
                 </Button>
@@ -246,12 +274,12 @@ const UpdateProduct = () => {
                   type="submit"
                   variant="contained"
                   disabled={submitting}
-                  sx={{ minWidth: { xs: "100%", sm: 150 } }}
+                  sx={{ minWidth: { xs: '100%', sm: 150 } }}
                 >
                   {submitting ? (
                     <CircularProgress size={24} color="inherit" />
                   ) : (
-                    "Update Product"
+                    'Update Product'
                   )}
                 </Button>
               </Box>

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -11,20 +11,22 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
-} from "@mui/material";
-import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
-import { productsApi } from "../api/api";
+} from '@mui/material';
+import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { productsApi } from '../api/api';
 
 const AddProduct = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState({ type: "", message: "" });
+  const [status, setStatus] = useState({ type: '', message: '' });
   const [formData, setFormData] = useState({
-    product_name: "",
-    barcode: "",
-    cost_price: "",
-    selling_price: "",
-    stock_qty: "",
+    product_name: '',
+    barcode: '',
+    cost_price: '',
+    selling_price: '',
+    stock_qty: '',
+    batch_no: 'INITIAL',
+    expiry_date: '',
   });
 
   const handleChange = (e) => {
@@ -46,14 +48,14 @@ const AddProduct = () => {
       !formData.stock_qty
     ) {
       setStatus({
-        type: "error",
-        message: "Please fill in all required fields",
+        type: 'error',
+        message: 'Please fill in all required fields',
       });
       return;
     }
 
     setLoading(true);
-    setStatus({ type: "", message: "" });
+    setStatus({ type: '', message: '' });
 
     try {
       await productsApi.create({
@@ -64,19 +66,19 @@ const AddProduct = () => {
       });
 
       setStatus({
-        type: "success",
-        message: "Product added successfully! Redirecting...",
+        type: 'success',
+        message: 'Product added successfully! Redirecting...',
       });
 
       // Redirect after a brief delay
       setTimeout(() => {
-        navigate("/admin");
+        navigate('/admin');
       }, 1500);
     } catch (err) {
-      console.error("Failed to add product:", err);
+      console.error('Failed to add product:', err);
       setStatus({
-        type: "error",
-        message: err.message || "Failed to add product. Please try again.",
+        type: 'error',
+        message: err.message || 'Failed to add product. Please try again.',
       });
     } finally {
       setLoading(false);
@@ -84,14 +86,14 @@ const AddProduct = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: 800, mx: "auto" }}>
+    <Box sx={{ maxWidth: 800, mx: 'auto' }}>
       <Box
         sx={{
           mb: 4,
-          display: "flex",
-          alignItems: "center",
+          display: 'flex',
+          alignItems: 'center',
           gap: 2,
-          flexWrap: "wrap",
+          flexWrap: 'wrap',
         }}
       >
         <IconButton onClick={() => navigate(-1)} color="primary">
@@ -151,7 +153,7 @@ const AddProduct = () => {
                     <InputAdornment position="start">₹</InputAdornment>
                   ),
                 }}
-                inputProps={{ step: "0.01", min: "0" }}
+                inputProps={{ step: '0.01', min: '0' }}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
@@ -168,7 +170,7 @@ const AddProduct = () => {
                     <InputAdornment position="start">₹</InputAdornment>
                   ),
                 }}
-                inputProps={{ step: "0.01", min: "0" }}
+                inputProps={{ step: '0.01', min: '0' }}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
@@ -180,24 +182,46 @@ const AddProduct = () => {
                 value={formData.stock_qty}
                 onChange={handleChange}
                 required
-                inputProps={{ min: "0" }}
+                inputProps={{ min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Batch Number"
+                name="batch_no"
+                value={formData.batch_no}
+                onChange={handleChange}
+                onFocus={(e) => e.target.select()}
+                placeholder="INITIAL"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Expiry Date"
+                name="expiry_date"
+                type="date"
+                value={formData.expiry_date}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Box
                 sx={{
-                  display: "flex",
+                  display: 'flex',
                   gap: 2,
-                  justifyContent: "flex-end",
-                  flexWrap: "wrap",
+                  justifyContent: 'flex-end',
+                  flexWrap: 'wrap',
                 }}
               >
                 <Button
                   variant="outlined"
                   onClick={() => navigate(-1)}
                   disabled={loading}
-                  sx={{ minWidth: { xs: "100%", sm: 120 } }}
+                  sx={{ minWidth: { xs: '100%', sm: 120 } }}
                 >
                   Cancel
                 </Button>
@@ -205,12 +229,12 @@ const AddProduct = () => {
                   type="submit"
                   variant="contained"
                   disabled={loading}
-                  sx={{ minWidth: { xs: "100%", sm: 150 } }}
+                  sx={{ minWidth: { xs: '100%', sm: 150 } }}
                 >
                   {loading ? (
                     <CircularProgress size={24} color="inherit" />
                   ) : (
-                    "Add Product"
+                    'Add Product'
                   )}
                 </Button>
               </Box>

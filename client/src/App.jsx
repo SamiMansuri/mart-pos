@@ -14,6 +14,7 @@ import CreateEmployee from './pages/CreateEmployee';
 import EmployeeList from './pages/EmployeeList';
 import ReturnBill from './pages/ReturnBill';
 import AdminBillDetails from './pages/AdminBillDetails';
+import Reports from './pages/Reports';
 import { getUserInfo, isTokenExpired } from './utils/auth.utils';
 
 // Guard for authenticated sessions
@@ -35,7 +36,9 @@ const RoleGuard = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/cashier'} replace />;
+    return (
+      <Navigate to={user.role === 'admin' ? '/admin' : '/cashier'} replace />
+    );
   }
   return children;
 };
@@ -47,14 +50,18 @@ const RootRedirect = () => {
     localStorage.removeItem('token');
     return <Navigate to="/login" replace />;
   }
-  return <Navigate to={user.role === 'admin' ? '/admin' : '/cashier'} replace />;
+  return (
+    <Navigate to={user.role === 'admin' ? '/admin' : '/cashier'} replace />
+  );
 };
 
-const NotFound = () => <div className="text-center mt-5 py-5">
-  <h1 className="display-1 fw-800 text-primary opacity-50">404</h1>
-  <h4 className="fw-bold">TERMINAL NOT FOUND</h4>
-  <p className="text-muted">The requested system node does not exist.</p>
-</div>;
+const NotFound = () => (
+  <div className="text-center mt-5 py-5">
+    <h1 className="display-1 fw-800 text-primary opacity-50">404</h1>
+    <h4 className="fw-bold">TERMINAL NOT FOUND</h4>
+    <p className="text-muted">The requested system node does not exist.</p>
+  </div>
+);
 
 function App() {
   return (
@@ -62,72 +69,123 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 
-        <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
+        <Route
+          path="/"
+          element={
+            <AuthGuard>
+              <Layout />
+            </AuthGuard>
+          }
+        >
           <Route index element={<RootRedirect />} />
 
           {/* Cashier Routes - Accessible by both cashier and admin */}
-          <Route path="cashier" element={
-            <RoleGuard allowedRoles={['cashier', 'admin']}>
-              <CashierDashboard />
-            </RoleGuard>
-          } />
-          <Route path="cashier/return" element={
-            <RoleGuard allowedRoles={['cashier', 'admin']}>
-              <ReturnBill />
-            </RoleGuard>
-          } />
-          <Route path="bills/create" element={
-            <RoleGuard allowedRoles={['cashier', 'admin']}>
-              <CreateBill />
-            </RoleGuard>
-          } />
-          <Route path="history" element={
-            <RoleGuard allowedRoles={['cashier', 'admin']}>
-              <BillHistory />
-            </RoleGuard>
-          } />
+          <Route
+            path="cashier"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <CashierDashboard />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="cashier/return"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <ReturnBill />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="bills/create"
+            element={
+              <RoleGuard allowedRoles={['cashier']}>
+                <CreateBill />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="history"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <BillHistory />
+              </RoleGuard>
+            }
+          />
 
           {/* Admin Routes - Only accessible by admin */}
-          <Route path="admin" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <AdminDashboard />
-            </RoleGuard>
-          } />
-          <Route path="admin/products/add" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <AddProduct />
-            </RoleGuard>
-          } />
-          <Route path="admin/products" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <ProductsList />
-            </RoleGuard>
-          } />
-          <Route path="admin/products/edit/:id" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <UpdateProduct />
-            </RoleGuard>
-          } />
-          <Route path="admin/users/create" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <CreateEmployee />
-            </RoleGuard>
-          } />
-          <Route path="admin/users" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <EmployeeList />
-            </RoleGuard>
-          } />
-          <Route path="bills" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <BillsList />
-            </RoleGuard>
-          } />
-          <Route path="admin/bills/:billId" element={
-            <RoleGuard allowedRoles={['admin']}>
-              <AdminBillDetails />
-            </RoleGuard>
-          } />
+          <Route
+            path="admin"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <AdminDashboard />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/products/add"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <AddProduct />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/products"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <ProductsList />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/products/edit/:id"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <UpdateProduct />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/users/create"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <CreateEmployee />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/users"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <EmployeeList />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="bills"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <BillsList />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/bills/:billId"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <AdminBillDetails />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/reports"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <Reports />
+              </RoleGuard>
+            }
+          />
 
           <Route path="*" element={<NotFound />} />
         </Route>

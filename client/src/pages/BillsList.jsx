@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { billsApi } from "../api/api";
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { billsApi } from '../api/api';
 import {
   Box,
   Paper,
@@ -19,12 +19,12 @@ import {
   Menu,
   MenuItem,
   Pagination,
-} from "@mui/material";
+} from '@mui/material';
 import {
   MoreVert as MoreIcon,
   Refresh as RefreshIcon,
   Add as AddIcon,
-} from "@mui/icons-material";
+} from '@mui/icons-material';
 
 const BillsList = () => {
   const navigate = useNavigate();
@@ -60,7 +60,7 @@ const BillsList = () => {
 
       setError(null);
     } catch (err) {
-      setError(err.message || "Failed to load bills");
+      setError(err.message || 'Failed to load bills');
     } finally {
       setLoading(false);
     }
@@ -91,22 +91,22 @@ const BillsList = () => {
       await billsApi.void(selectedBill.id);
       fetchBills();
     } catch (err) {
-      alert(err.message || "Failed to void transaction");
+      alert(err.message || 'Failed to void transaction');
     } finally {
       handleMenuClose();
     }
   };
 
   const getStatusColor = (bill) => {
-    if (bill.is_void) return "error";
+    if (bill.is_void) return 'error';
     switch (bill.payment_status) {
-      case "PAID":
-        return "success";
-      case "REFUNDED":
-      case "PARTIALLY_REFUNDED":
-        return "warning";
+      case 'PAID':
+        return 'success';
+      case 'REFUNDED':
+      case 'PARTIALLY_REFUNDED':
+        return 'warning';
       default:
-        return "default";
+        return 'default';
     }
   };
 
@@ -129,11 +129,11 @@ const BillsList = () => {
     <Box>
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           mb: 3,
-          flexWrap: "wrap",
+          flexWrap: 'wrap',
           gap: 2,
         }}
       >
@@ -145,51 +145,29 @@ const BillsList = () => {
             {totalItems} total transactions
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton onClick={fetchBills} disabled={loading}>
             <RefreshIcon />
           </IconButton>
-          <Button
-            variant="contained"
-            startIcon={
-              <AddIcon sx={{ display: { xs: "none", sm: "inline-flex" } }} />
-            }
-            component={Link}
-            to="/bills/create"
-            sx={{ whiteSpace: "nowrap" }}
-          >
-            <Box
-              component="span"
-              sx={{ display: { xs: "none", sm: "inline" } }}
-            >
-              New Bill
-            </Box>
-            <Box
-              component="span"
-              sx={{ display: { xs: "inline", sm: "none" } }}
-            >
-              New
-            </Box>
-          </Button>
         </Box>
       </Box>
 
       <TableContainer
         component={Paper}
-        sx={{ position: "relative", overflowX: "auto" }}
+        sx={{ position: 'relative', overflowX: 'auto' }}
       >
         {loading && (
           <Box
             sx={{
-              position: "absolute",
+              position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: "rgba(255, 255, 255, 0.7)",
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(255, 255, 255, 0.7)',
               zIndex: 1,
             }}
           >
@@ -233,8 +211,8 @@ const BillsList = () => {
                       {new Date(
                         bill.created_at || bill.date,
                       ).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
+                        hour: '2-digit',
+                        minute: '2-digit',
                       })}
                     </Typography>
                   </TableCell>
@@ -245,7 +223,7 @@ const BillsList = () => {
                   </TableCell>
                   <TableCell align="center">
                     <Chip
-                      label={bill.is_void ? "VOID" : bill.payment_status}
+                      label={bill.is_void ? 'VOID' : bill.payment_status}
                       color={getStatusColor(bill)}
                       size="small"
                     />
@@ -266,7 +244,7 @@ const BillsList = () => {
       </TableContainer>
 
       {totalPages > 1 && (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
           <Pagination
             count={totalPages}
             page={page}
@@ -282,13 +260,17 @@ const BillsList = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={() => {
-          navigate(`/admin/bills/${selectedBill.id}`);
-          handleMenuClose();
-        }}>View Details</MenuItem>
+        <MenuItem
+          onClick={() => {
+            navigate(`/admin/bills/${selectedBill.id}`);
+            handleMenuClose();
+          }}
+        >
+          View Details
+        </MenuItem>
         <MenuItem onClick={handleMenuClose}>Print</MenuItem>
         {selectedBill && !selectedBill.is_void && (
-          <MenuItem onClick={handleVoid} sx={{ color: "error.main" }}>
+          <MenuItem onClick={handleVoid} sx={{ color: 'error.main' }}>
             Void Transaction
           </MenuItem>
         )}

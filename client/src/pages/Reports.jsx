@@ -1,157 +1,336 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React from 'react';
+import {
+  Box,
+  Typography,
+  Grid,
+  Paper,
+  Card,
+  CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  LinearProgress,
+  Chip,
+  Divider,
+} from '@mui/material';
+import {
+  TrendingUp as SalesIcon,
+  Inventory as InventoryIcon,
+  People as PerformanceIcon,
+  BarChart as AnalyticsIcon,
+  ArrowUpward as UpIcon,
+  ArrowDownward as DownIcon,
+  DateRange as RangeIcon,
+} from '@mui/icons-material';
+
+import DateRangeSelector from '../components/DateRangeSelector';
 
 const Reports = () => {
-  const [bills, setBills] = useState([]);
+  const [dateRange, setDateRange] = React.useState({
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+  });
 
-  useEffect(() => {
-    const savedBills = JSON.parse(localStorage.getItem('super_mart_bills') || '[]');
-    setBills(savedBills);
-  }, []);
-
-  const stats = useMemo(() => {
-    // Only count non-voided bills for sales stats
-    const activeBills = bills.filter(b => b.status !== 'voided');
-    
-    const totalBills = activeBills.length;
-    let totalSales = 0;
-    let cashSales = 0;
-    let upiSales = 0;
-
-    activeBills.forEach(bill => {
-      totalSales += bill.totalAmount;
-      if (bill.paymentMethod === 'Cash') {
-        cashSales += bill.totalAmount;
-      } else if (bill.paymentMethod === 'UPI') {
-        upiSales += bill.totalAmount;
-      }
-    });
-
-    return { totalBills, totalSales, cashSales, upiSales };
-  }, [bills]);
-
-  const voidBill = (billId) => {
-    if (!window.confirm('Void this bill? Items will be returned to stock.')) return;
-
-    const billToVoid = bills.find(b => b.billId === billId);
-    if (!billToVoid) return;
-
-    // 1. Update bill status
-    const updatedBills = bills.map(b => 
-      b.billId === billId ? { ...b, status: 'voided' } : b
-    );
-    setBills(updatedBills);
-    localStorage.setItem('super_mart_bills', JSON.stringify(updatedBills));
-
-    // 2. Reverse Stock
-    const products = JSON.parse(localStorage.getItem('super_mart_products') || '[]');
-    const updatedProducts = products.map(p => {
-      const returnedItem = billToVoid.items.find(item => item.id === p.id);
-      if (returnedItem) {
-        return { ...p, stock: (p.stock || 0) + returnedItem.qty };
-      }
-      return p;
-    });
-    localStorage.setItem('super_mart_products', JSON.stringify(updatedProducts));
+  const handleDateApply = (range) => {
+    console.log('Applying date range:', range);
+    setDateRange(range);
+    // Future: Trigger API refetch here
   };
 
+  // Mock data for prototype
+  const stats = [
+    {
+      title: 'Daily Revenue',
+      value: '₹45,230.50',
+      change: '+12.5%',
+      trending: 'up',
+      icon: <SalesIcon />,
+      color: 'primary.main',
+    },
+    {
+      title: 'Active Categories',
+      value: '12',
+      change: 'Stabilized',
+      trending: 'none',
+      icon: <InventoryIcon />,
+      color: 'success.main',
+    },
+    {
+      title: 'Return Rate',
+      value: '0.8%',
+      change: '-0.5%',
+      trending: 'down',
+      icon: <AnalyticsIcon />,
+      color: 'error.main',
+    },
+  ];
+
+  const topProducts = [
+    {
+      name: 'Family Milk 1L',
+      sales: 450,
+      growth: 85,
+      stock: 24,
+      status: 'Healthy',
+    },
+    {
+      name: 'Organo Bread 400g',
+      sales: 380,
+      growth: 60,
+      stock: 8,
+      status: 'Low Stock',
+    },
+    {
+      name: 'Sunrise Eggs (12pk)',
+      sales: 310,
+      growth: 45,
+      stock: 15,
+      status: 'Healthy',
+    },
+    {
+      name: 'Royal Basmati 5kg',
+      sales: 290,
+      growth: -12,
+      stock: 45,
+      status: 'Slow Moving',
+    },
+  ];
+
   return (
-    <div className="pos-container" style={{ flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Daily Sales Summary</h1>
-      </div>
+    <Box>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight={800} gutterBottom>
+          Management Reports
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          High-level operational overview and performance analytics
+        </Typography>
+      </Box>
 
-      <div className="product-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', overflow: 'visible' }}>
-        <div className="pos-card" style={{ textAlign: 'center' }}>
-          <h3 style={{ color: 'var(--muted)', fontSize: '1rem', marginBottom: '10px' }}>Total Bills (Active)</h3>
-          <p style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--primary)' }}>{stats.totalBills}</p>
-        </div>
+      <DateRangeSelector onApply={handleDateApply} />
 
-        <div className="pos-card" style={{ textAlign: 'center' }}>
-          <h3 style={{ color: 'var(--muted)', fontSize: '1rem', marginBottom: '10px' }}>Total Sales (Active)</h3>
-          <p style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--success)' }}>₹{stats.totalSales}</p>
-        </div>
-      </div>
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <RangeIcon fontSize="small" color="action" />
+        <Typography variant="body2" color="text.secondary" fontWeight={600}>
+          Reporting Period:{' '}
+          <Box component="span" sx={{ color: 'primary.main' }}>
+            {new Date(dateRange.startDate).toLocaleDateString()} -{' '}
+            {new Date(dateRange.endDate).toLocaleDateString()}
+          </Box>
+        </Typography>
+      </Box>
 
-      <div className="pos-card" style={{ marginTop: '20px' }}>
-        <h3 style={{ marginBottom: '20px' }}>Payment-wise Breakdown (Active)</h3>
-        <div style={{ display: 'flex', gap: '20px' }}>
-          <div style={{ flex: 1, padding: '20px', background: 'var(--bg)', borderRadius: 'var(--radius)' }}>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Cash Sales</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>₹{stats.cashSales}</p>
-          </div>
-          <div style={{ flex: 1, padding: '20px', background: 'var(--bg)', borderRadius: 'var(--radius)' }}>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>UPI Sales</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 600 }}>₹{stats.upiSales}</p>
-          </div>
-        </div>
-      </div>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {stats.map((stat, idx) => (
+          <Grid item xs={12} sm={4} key={idx}>
+            <Card
+              elevation={0}
+              sx={{ border: '1px solid', borderColor: 'divider' }}
+            >
+              <CardContent>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    mb: 2,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 1.5,
+                      bgcolor: `${stat.color}15`,
+                      color: stat.color,
+                      display: 'flex',
+                    }}
+                  >
+                    {stat.icon}
+                  </Box>
+                  <Chip
+                    label={stat.change}
+                    size="small"
+                    color={
+                      stat.trending === 'up'
+                        ? 'success'
+                        : stat.trending === 'down'
+                          ? 'error'
+                          : 'default'
+                    }
+                    sx={{ fontWeight: 700 }}
+                  />
+                </Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  fontWeight={600}
+                >
+                  {stat.title}
+                </Typography>
+                <Typography variant="h5" fontWeight={800}>
+                  {stat.value}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
 
-      {bills.length > 0 && (
-        <div className="pos-card" style={{ marginTop: '20px', flex: 1, overflowY: 'auto' }}>
-          <h3 style={{ marginBottom: '15px' }}>Transaction History</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)' }}>
-                <th style={{ padding: '10px' }}>Bill ID</th>
-                <th style={{ padding: '10px' }}>Time</th>
-                <th style={{ padding: '10px' }}>Method</th>
-                <th style={{ padding: '10px' }}>Status</th>
-                <th style={{ padding: '10px', textAlign: 'right' }}>Amount</th>
-                <th style={{ padding: '10px', textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bills.slice().reverse().map(bill => (
-                <tr key={bill.billId} style={{ 
-                  borderBottom: '1px solid var(--border)',
-                  opacity: bill.status === 'voided' ? 0.6 : 1,
-                  background: bill.status === 'voided' ? '#fff5f5' : 'transparent'
-                }}>
-                  <td style={{ padding: '10px', fontSize: '0.9rem' }}>
-                    {bill.status === 'voided' && <span style={{ textDecoration: 'line-through' }}>{bill.billId}</span>}
-                    {bill.status !== 'voided' && bill.billId}
-                  </td>
-                  <td style={{ padding: '10px', fontSize: '0.9rem' }}>{new Date(bill.createdAt).toLocaleTimeString()}</td>
-                  <td style={{ padding: '10px' }}>
-                    <span style={{ 
-                      padding: '2px 8px', 
-                      borderRadius: '12px', 
-                      fontSize: '0.8rem',
-                      background: bill.paymentMethod === 'Cash' ? '#fde68a' : '#bfdbfe',
-                      color: bill.paymentMethod === 'Cash' ? '#92400e' : '#1e40af'
-                    }}>
-                      {bill.paymentMethod}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    <span style={{ 
-                      padding: '2px 8px', 
-                      borderRadius: '12px', 
-                      fontSize: '0.8rem',
-                      background: bill.status === 'voided' ? 'var(--danger)' : 'var(--success)',
-                      color: 'white'
-                    }}>
-                      {bill.status || 'completed'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px', textAlign: 'right', fontWeight: 600 }}>₹{bill.totalAmount}</td>
-                  <td style={{ padding: '10px', textAlign: 'right' }}>
-                    {bill.status !== 'voided' && (
-                      <button 
-                        onClick={() => voidBill(bill.billId)}
-                        style={{ background: 'transparent', color: 'var(--danger)', fontSize: '0.8rem', padding: '5px' }}
-                      >
-                        Void
-                      </button>
-                    )}
-                  </td>
-                </tr>
+      <Grid container spacing={3}>
+        {/* Sales Performance Visualization Placeholder */}
+        <Grid item xs={12} lg={12}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 4,
+              }}
+            >
+              <Typography variant="h6" fontWeight={700}>
+                Sales Volume Analysis
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                LAST 7 DAYS
+              </Typography>
+            </Box>
+
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 2,
+                height: 280,
+                mb: 2,
+                px: 2,
+              }}
+            >
+              {[40, 65, 30, 85, 55, 90, 70].map((h, i) => (
+                <Box key={i} sx={{ flex: 1, position: 'relative' }}>
+                  <Box
+                    sx={{
+                      height: `${h}%`,
+                      bgcolor: i === 5 ? 'primary.main' : 'primary.light',
+                      borderRadius: '4px 4px 0 0',
+                      transition: 'height 0.3s ease-in-out',
+                      '&:hover': { bgcolor: 'primary.dark' },
+                    }}
+                  />
+                  <Typography
+                    variant="caption"
+                    align="center"
+                    display="block"
+                    sx={{ mt: 1, color: 'text.secondary' }}
+                  >
+                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
+                  </Typography>
+                </Box>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+            </Box>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="body2" color="text.secondary" align="center">
+              Peak trading hours identified between <b>18:00 - 21:00</b>
+            </Typography>
+          </Paper>
+        </Grid>
+
+        {/* Top Products Table */}
+        <Grid item xs={12}>
+          <Paper
+            elevation={0}
+            sx={{ border: '1px solid', borderColor: 'divider' }}
+          >
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight={700}>
+                Velocity Tracking
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Product movement speed and stock efficiency
+              </Typography>
+            </Box>
+            <TableContainer>
+              <Table>
+                <TableHead sx={{ bgcolor: 'action.hover' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>PRODUCT</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      SALES VOL
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      GROWTH
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>
+                      STOCK
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700 }}>
+                      STATUS
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {topProducts.map((p, idx) => (
+                    <TableRow key={idx} hover>
+                      <TableCell sx={{ fontWeight: 600 }}>{p.name}</TableCell>
+                      <TableCell align="right">{p.sales} units</TableCell>
+                      <TableCell align="right">
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            gap: 0.5,
+                          }}
+                        >
+                          {p.growth > 0 ? (
+                            <UpIcon color="success" fontSize="inherit" />
+                          ) : (
+                            <DownIcon color="error" fontSize="inherit" />
+                          )}
+                          <Typography
+                            variant="body2"
+                            color={p.growth > 0 ? 'success.main' : 'error.main'}
+                          >
+                            {Math.abs(p.growth)}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">{p.stock} pcs</TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={p.status}
+                          size="small"
+                          variant="outlined"
+                          color={
+                            p.status === 'Healthy'
+                              ? 'success'
+                              : p.status === 'Low Stock'
+                                ? 'error'
+                                : 'warning'
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

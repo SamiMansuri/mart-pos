@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -26,30 +26,30 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-} from "@mui/material";
+} from '@mui/material';
 import {
   Search as SearchIcon,
   ArrowBack as BackIcon,
   RemoveCircleOutline as RemoveIcon,
   AddCircleOutline as AddIcon,
-} from "@mui/icons-material";
-import { billsApi } from "../api/api";
+} from '@mui/icons-material';
+import { billsApi } from '../api/api';
 
 const ReturnBill = () => {
   const navigate = useNavigate();
-  const [searchType, setSearchType] = useState("bill_number"); // bill_number or date_invoice
-  const [searchValue, setSearchValue] = useState("");
+  const [searchType, setSearchType] = useState('bill_number'); // bill_number or date_invoice
+  const [searchValue, setSearchValue] = useState('');
   const [businessDate, setBusinessDate] = useState(
-    new Date().toISOString().split("T")[0],
+    new Date().toISOString().split('T')[0],
   );
-  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [bill, setBill] = useState(null);
   const [returnItems, setReturnItems] = useState({}); // productId -> quantity
-  const [refundRequired, setRefundRequired] = useState("WITH_REFUND");
-  const [refundMethod, setRefundMethod] = useState("CASH");
+  const [refundRequired, setRefundRequired] = useState('WITH_REFUND');
+  const [refundMethod, setRefundMethod] = useState('CASH');
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const fetchBill = async () => {
@@ -59,7 +59,7 @@ const ReturnBill = () => {
     setReturnItems({});
     try {
       let params = {};
-      if (searchType === "bill_number") {
+      if (searchType === 'bill_number') {
         params.bill_number = searchValue.trim();
       } else {
         params.business_date = businessDate;
@@ -68,9 +68,27 @@ const ReturnBill = () => {
 
       const searchRes = await billsApi.search(params);
       const billDetails = await billsApi.getById(searchRes.bill_id);
-      setBill(billDetails);
+
+      // Group items by product_id for display
+      const groupedItems = [];
+      const itemMap = new Map();
+
+      billDetails.items.forEach((item) => {
+        if (itemMap.has(item.product_id)) {
+          const existing = itemMap.get(item.product_id);
+          existing.quantity = Number(existing.quantity) + Number(item.quantity);
+          existing.line_total =
+            Number(existing.line_total) + Number(item.line_total);
+        } else {
+          const itemCopy = { ...item };
+          itemMap.set(item.product_id, itemCopy);
+          groupedItems.push(itemCopy);
+        }
+      });
+
+      setBill({ ...billDetails, items: groupedItems });
     } catch (err) {
-      setError(err.message || "Bill not found");
+      setError(err.message || 'Bill not found');
     } finally {
       setLoading(false);
     }
@@ -103,22 +121,22 @@ const ReturnBill = () => {
           quantity: qty,
         }));
 
-      if (items.length === 0) throw new Error("No items selected for return");
+      if (items.length === 0) throw new Error('No items selected for return');
 
       await billsApi.createReturn(bill.bill_id, {
         items,
-        reason: "Customer Return",
+        reason: 'Customer Return',
         payment_method: refundMethod,
         idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        refund_required: refundRequired === "WITH_REFUND",
+        refund_required: refundRequired === 'WITH_REFUND',
       });
 
       // Navigate back or show success
-      alert("Return processed successfully");
-      navigate("/cashier");
+      alert('Return processed successfully');
+      navigate('/cashier');
     } catch (err) {
       console.log(err);
-      setError(err.error.message || "Failed to process return");
+      setError(err.error.message || 'Failed to process return');
     } finally {
       setLoading(false);
     }
@@ -126,8 +144,8 @@ const ReturnBill = () => {
 
   return (
     <Box>
-      <Box sx={{ mb: 4, display: "flex", alignItems: "center", gap: 2 }}>
-        <IconButton onClick={() => navigate("/cashier")}>
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <IconButton onClick={() => navigate('/cashier')}>
           <BackIcon />
         </IconButton>
         <Typography variant="h4" fontWeight={700}>
@@ -161,7 +179,7 @@ const ReturnBill = () => {
               </RadioGroup>
             </FormControl>
           </Grid>
-          {searchType === "bill_number" ? (
+          {searchType === 'bill_number' ? (
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -217,7 +235,7 @@ const ReturnBill = () => {
       </Paper>
 
       {loading && !bill && (
-        <Box sx={{ textAlign: "center", py: 4 }}>
+        <Box sx={{ textAlign: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
       )}
@@ -227,12 +245,12 @@ const ReturnBill = () => {
           <Grid item xs={12} lg={8}>
             <Paper sx={{ p: 4 }}>
               <Box
-                sx={{ mb: 3, display: "flex", justifyContent: "space-between" }}
+                sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}
               >
                 <Typography variant="h6" fontWeight={700}>
                   Bill Items
                 </Typography>
-                <Box sx={{ textAlign: "right" }}>
+                <Box sx={{ textAlign: 'right' }}>
                   <Typography variant="body2" color="text.secondary">
                     Bill #: <strong>{bill.bill_number}</strong>
                   </Typography>
@@ -262,9 +280,9 @@ const ReturnBill = () => {
                         <TableCell align="center">
                           <Box
                             sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               gap: 1,
                             }}
                           >
@@ -317,14 +335,14 @@ const ReturnBill = () => {
           </Grid>
 
           <Grid item xs={12} lg={4}>
-            <Paper sx={{ p: 4, position: "sticky", top: 20 }}>
+            <Paper sx={{ p: 4, position: 'sticky', top: 20 }}>
               <Typography variant="h6" gutterBottom fontWeight={700}>
                 Return Summary
               </Typography>
               <Divider sx={{ my: 2 }} />
 
               <Box
-                sx={{ mb: 3, display: "flex", justifyContent: "space-between" }}
+                sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}
               >
                 <Typography variant="body1">Total Return Amount</Typography>
                 <Typography variant="h6" color="primary" fontWeight={700}>
@@ -353,7 +371,7 @@ const ReturnBill = () => {
                 </RadioGroup>
               </Box>
 
-              {refundRequired === "WITH_REFUND" && (
+              {refundRequired === 'WITH_REFUND' && (
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                     Refund Mode
@@ -399,18 +417,18 @@ const ReturnBill = () => {
         <DialogTitle>Confirm Return</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to process this return for{" "}
+            Are you sure you want to process this return for{' '}
             <strong>₹{totalReturnAmount.toFixed(2)}</strong>?
           </Typography>
-          {refundRequired === "WITH_REFUND" ? (
+          {refundRequired === 'WITH_REFUND' ? (
             <Typography
               variant="body2"
-              sx={{ mt: 1, color: "primary.main", fontWeight: 600 }}
+              sx={{ mt: 1, color: 'primary.main', fontWeight: 600 }}
             >
               A refund will be issued via {refundMethod}.
             </Typography>
           ) : (
-            <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
+            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
               No refund will be issued for this return.
             </Typography>
           )}
