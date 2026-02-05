@@ -15,6 +15,7 @@ import {
   LinearProgress,
   Chip,
   Divider,
+  Alert,
 } from '@mui/material';
 import {
   TrendingUp as SalesIcon,
@@ -25,7 +26,7 @@ import {
   ArrowDownward as DownIcon,
   DateRange as RangeIcon,
 } from '@mui/icons-material';
-
+import { reportsApi } from '../api/api';
 import DateRangeSelector from '../components/DateRangeSelector';
 
 const Reports = () => {
@@ -36,70 +37,74 @@ const Reports = () => {
     endDate: new Date().toISOString().split('T')[0],
   });
 
-  const handleDateApply = (range) => {
-    console.log('Applying date range:', range);
-    setDateRange(range);
-    // Future: Trigger API refetch here
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [data, setData] = React.useState({
+    summary: {
+      total_revenue: 0,
+      total_profit: 0,
+      total_bills: 0,
+      total_cost: 0,
+    },
+    topProducts: [],
+  });
+
+  const fetchReports = async (range) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await reportsApi.getStats(range.startDate, range.endDate);
+      setData(res);
+    } catch (err) {
+      console.error('Failed to fetch reports:', err);
+      setError('Failed to load reporting data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Mock data for prototype
+  React.useEffect(() => {
+    fetchReports(dateRange);
+  }, [dateRange]);
+
+  const handleDateApply = (range) => {
+    setDateRange(range);
+  };
+
+  const formatCurrency = (val) =>
+    `₹${parseFloat(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
   const stats = [
     {
-      title: 'Daily Revenue',
-      value: '₹45,230.50',
-      change: '+12.5%',
-      trending: 'up',
+      title: 'Total Revenue',
+      value: formatCurrency(data.summary?.total_revenue),
+      change: `From ${data.summary?.total_bills || 0} bills`,
+      trending: 'none',
       icon: <SalesIcon />,
       color: 'primary.main',
     },
     {
-      title: 'Active Categories',
-      value: '12',
-      change: 'Stabilized',
-      trending: 'none',
-      icon: <InventoryIcon />,
+      title: 'Net Profit',
+      value: formatCurrency(data.summary?.total_profit),
+      change:
+        data.summary?.total_revenue > 0
+          ? `${((data.summary.total_profit / data.summary.total_revenue) * 100).toFixed(1)}% Margin`
+          : '0% Margin',
+      trending: 'up',
+      icon: <AnalyticsIcon />,
       color: 'success.main',
     },
     {
-      title: 'Return Rate',
-      value: '0.8%',
-      change: '-0.5%',
-      trending: 'down',
-      icon: <AnalyticsIcon />,
-      color: 'error.main',
+      title: 'Inventory Cost',
+      value: formatCurrency(data.summary?.total_cost),
+      change: 'Outgoing capital',
+      trending: 'none',
+      icon: <InventoryIcon />,
+      color: 'warning.main',
     },
   ];
 
-  const topProducts = [
-    {
-      name: 'Family Milk 1L',
-      sales: 450,
-      growth: 85,
-      stock: 24,
-      status: 'Healthy',
-    },
-    {
-      name: 'Organo Bread 400g',
-      sales: 380,
-      growth: 60,
-      stock: 8,
-      status: 'Low Stock',
-    },
-    {
-      name: 'Sunrise Eggs (12pk)',
-      sales: 310,
-      growth: 45,
-      stock: 15,
-      status: 'Healthy',
-    },
-    {
-      name: 'Royal Basmati 5kg',
-      sales: 290,
-      growth: -12,
-      stock: 45,
-      status: 'Slow Moving',
-    },
-  ];
+  const topProducts = data.topProducts;
 
   return (
     <Box>
@@ -124,6 +129,13 @@ const Reports = () => {
           </Box>
         </Typography>
       </Box>
+
+      {loading && <LinearProgress sx={{ mb: 4, borderRadius: 1 }} />}
+      {error && (
+        <Alert severity="error" sx={{ mb: 4 }}>
+          {error}
+        </Alert>
+      )}
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {stats.map((stat, idx) => (
@@ -270,10 +282,10 @@ const Reports = () => {
                       SALES VOL
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      GROWTH
+                      REVENUE
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
-                      STOCK
+                      PROFIT
                     </TableCell>
                     <TableCell align="center" sx={{ fontWeight: 700 }}>
                       STATUS
@@ -286,40 +298,17 @@ const Reports = () => {
                       <TableCell sx={{ fontWeight: 600 }}>{p.name}</TableCell>
                       <TableCell align="right">{p.sales} units</TableCell>
                       <TableCell align="right">
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-end',
-                            gap: 0.5,
-                          }}
-                        >
-                          {p.growth > 0 ? (
-                            <UpIcon color="success" fontSize="inherit" />
-                          ) : (
-                            <DownIcon color="error" fontSize="inherit" />
-                          )}
-                          <Typography
-                            variant="body2"
-                            color={p.growth > 0 ? 'success.main' : 'error.main'}
-                          >
-                            {Math.abs(p.growth)}%
-                          </Typography>
-                        </Box>
+                        {formatCurrency(p.revenue)}
                       </TableCell>
-                      <TableCell align="right">{p.stock} pcs</TableCell>
+                      <TableCell align="right">
+                        {formatCurrency(p.profit)}
+                      </TableCell>
                       <TableCell align="center">
                         <Chip
-                          label={p.status}
+                          label={p.profit > 0 ? 'Profitable' : 'No Margin'}
                           size="small"
                           variant="outlined"
-                          color={
-                            p.status === 'Healthy'
-                              ? 'success'
-                              : p.status === 'Low Stock'
-                                ? 'error'
-                                : 'warning'
-                          }
+                          color={p.profit > 0 ? 'success' : 'default'}
                         />
                       </TableCell>
                     </TableRow>
