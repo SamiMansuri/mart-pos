@@ -22,11 +22,7 @@ const AddProduct = () => {
   const [formData, setFormData] = useState({
     product_name: '',
     barcode: '',
-    cost_price: '',
     selling_price: '',
-    stock_qty: '',
-    batch_no: 'INITIAL',
-    expiry_date: '',
   });
 
   const handleChange = (e) => {
@@ -41,12 +37,7 @@ const AddProduct = () => {
     e.preventDefault();
 
     // Basic validation
-    if (
-      !formData.product_name ||
-      !formData.cost_price ||
-      !formData.selling_price ||
-      !formData.stock_qty
-    ) {
+    if (!formData.product_name || !formData.selling_price) {
       setStatus({
         type: 'error',
         message: 'Please fill in all required fields',
@@ -60,9 +51,7 @@ const AddProduct = () => {
     try {
       await productsApi.create({
         ...formData,
-        cost_price: parseFloat(formData.cost_price),
         selling_price: parseFloat(formData.selling_price),
-        stock_qty: parseInt(formData.stock_qty, 10),
       });
 
       setStatus({
@@ -139,24 +128,7 @@ const AddProduct = () => {
                 placeholder="Scan or enter barcode"
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Cost Price"
-                name="cost_price"
-                type="number"
-                value={formData.cost_price}
-                onChange={handleChange}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">₹</InputAdornment>
-                  ),
-                }}
-                inputProps={{ step: '0.01', min: '0' }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Selling Price"
@@ -171,40 +143,6 @@ const AddProduct = () => {
                   ),
                 }}
                 inputProps={{ step: '0.01', min: '0' }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Stock Quantity"
-                name="stock_qty"
-                type="number"
-                value={formData.stock_qty}
-                onChange={handleChange}
-                required
-                inputProps={{ min: '0' }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Batch Number"
-                name="batch_no"
-                value={formData.batch_no}
-                onChange={handleChange}
-                onFocus={(e) => e.target.select()}
-                placeholder="INITIAL"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Expiry Date"
-                name="expiry_date"
-                type="date"
-                value={formData.expiry_date}
-                onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 

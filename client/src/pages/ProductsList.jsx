@@ -135,6 +135,14 @@ const ProductsList = () => {
             }}
           />
           <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => navigate('/admin/stock')}
+            sx={{ whiteSpace: 'nowrap', width: { xs: '100%', md: 'auto' } }}
+          >
+            Stock Entry
+          </Button>
+          <Button
             variant="contained"
             startIcon={
               <AddIcon sx={{ display: { xs: 'none', sm: 'inline-flex' } }} />

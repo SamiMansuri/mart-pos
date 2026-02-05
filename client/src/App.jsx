@@ -15,6 +15,7 @@ import EmployeeList from './pages/EmployeeList';
 import ReturnBill from './pages/ReturnBill';
 import AdminBillDetails from './pages/AdminBillDetails';
 import Reports from './pages/Reports';
+import StockEntry from './pages/StockEntry';
 import { getUserInfo, isTokenExpired } from './utils/auth.utils';
 
 // Guard for authenticated sessions
@@ -143,6 +144,14 @@ function App() {
             element={
               <RoleGuard allowedRoles={['admin']}>
                 <UpdateProduct />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/stock"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <StockEntry />
               </RoleGuard>
             }
           />

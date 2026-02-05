@@ -130,7 +130,7 @@ export const createBill = asyncHandler(async (req, res) => {
 
       // Fetch batches ordered by FEFO
       const { rows: batches } = await client.query(
-        "SELECT id, quantity FROM product_batches WHERE product_id = $1 AND quantity > 0 ORDER BY expiry_date ASC NULLS LAST FOR UPDATE",
+        "SELECT id, quantity, cost_price FROM product_batches WHERE product_id = $1 AND quantity > 0 ORDER BY expiry_date ASC NULLS LAST, created_at ASC FOR UPDATE",
         [item.product_id],
       );
 
@@ -141,7 +141,7 @@ export const createBill = asyncHandler(async (req, res) => {
         const lineTotal = price * deductionFromBatch;
 
         await client.query(
-          "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+          "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
           [
             billId,
             item.product_id,
@@ -150,17 +150,13 @@ export const createBill = asyncHandler(async (req, res) => {
             lineTotal,
             product.name,
             batch.id,
+            batch.cost_price,
           ],
         );
 
         await client.query(
           "UPDATE product_batches SET quantity = quantity - $1 WHERE id = $2",
           [deductionFromBatch, batch.id],
-        );
-
-        await client.query(
-          "UPDATE stock SET quantity = quantity - $1, updated_at = NOW() WHERE product_id = $2",
-          [deductionFromBatch, item.product_id],
         );
 
         await client.query(
@@ -339,11 +335,6 @@ export const voidBill = asyncHandler(async (req, res) => {
       }
 
       await client.query(
-        "UPDATE stock SET quantity = quantity + $1, updated_at = NOW() WHERE product_id = $2",
-        [item.quantity, item.product_id],
-      );
-
-      await client.query(
         "INSERT INTO stock_movements(product_id, quantity, movement_type, reference, created_by, batch_id) VALUES ($1, $2, 'IN', $3, $4, $5)",
         [item.product_id, item.quantity, reference, user_id, item.batch_id],
       );
@@ -516,11 +507,6 @@ export const createReturn = asyncHandler(async (req, res) => {
             [restoreToThisBI, item.product_id],
           );
         }
-
-        await client.query(
-          "UPDATE stock SET quantity = quantity + $1, updated_at = NOW() WHERE product_id = $2",
-          [restoreToThisBI, item.product_id],
-        );
 
         await client.query(
           `
