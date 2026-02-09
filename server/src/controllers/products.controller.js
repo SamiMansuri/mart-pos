@@ -151,13 +151,22 @@ export const getProductById = asyncHandler(async (req, res) => {
 });
 
 export const createProduct = asyncHandler(async (req, res) => {
-  const { product_name: name, barcode, selling_price } = req.body;
+  const {
+    product_name: name,
+    barcode,
+    selling_price,
+    batch_no,
+    quantity,
+    cost_price,
+    expiry_date,
+  } = req.body;
   const { user_id } = req.user;
 
   const result = await withTransaction(async (client) => {
     let product;
 
     try {
+      // 1. Create Product
       const productRes = await client.query(
         `
         INSERT INTO products (name, barcode, selling_price, created_by)
@@ -168,6 +177,40 @@ export const createProduct = asyncHandler(async (req, res) => {
       );
 
       product = productRes.rows[0];
+
+      // 2. Create Initial Batch
+      const initialBatchNo = batch_no || "INITIAL";
+      const initialQty = quantity || 0;
+      const initialCost = cost_price || 0;
+
+      const batchRes = await client.query(
+        `
+        INSERT INTO product_batches (product_id, batch_no, quantity, cost_price, expiry_date, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+        `,
+        [
+          product.id,
+          initialBatchNo,
+          initialQty,
+          initialCost,
+          expiry_date || null,
+          user_id,
+        ],
+      );
+
+      const batch = batchRes.rows[0];
+
+      // 3. Record Stock Movement if quantity is provided
+      if (initialQty > 0) {
+        await client.query(
+          `
+          INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by, batch_id)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          `,
+          [product.id, initialQty, "IN", "INITIAL_STOCK", user_id, batch.id],
+        );
+      }
     } catch (err) {
       if (err.code === "23505") {
         throw createHttpError(

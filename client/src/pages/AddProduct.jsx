@@ -23,6 +23,10 @@ const AddProduct = () => {
     product_name: '',
     barcode: '',
     selling_price: '',
+    batch_no: '',
+    quantity: '',
+    cost_price: '',
+    expiry_date: '',
   });
 
   const handleChange = (e) => {
@@ -52,6 +56,8 @@ const AddProduct = () => {
       await productsApi.create({
         ...formData,
         selling_price: parseFloat(formData.selling_price),
+        quantity: formData.quantity ? parseInt(formData.quantity, 10) : 0,
+        cost_price: formData.cost_price ? parseFloat(formData.cost_price) : 0,
       });
 
       setStatus({
@@ -128,7 +134,7 @@ const AddProduct = () => {
                 placeholder="Scan or enter barcode"
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Selling Price"
@@ -143,6 +149,57 @@ const AddProduct = () => {
                   ),
                 }}
                 inputProps={{ step: '0.01', min: '0' }}
+              />
+            </Grid>
+
+            {/* Batch and Stock Info */}
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Batch Number (Optional)"
+                name="batch_no"
+                value={formData.batch_no}
+                onChange={handleChange}
+                placeholder='Defaults to "INITIAL"'
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Quantity (Optional)"
+                name="quantity"
+                type="number"
+                value={formData.quantity}
+                onChange={handleChange}
+                placeholder="Initial stock"
+                inputProps={{ min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Cost Price (Optional)"
+                name="cost_price"
+                type="number"
+                value={formData.cost_price}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">₹</InputAdornment>
+                  ),
+                }}
+                inputProps={{ step: '0.01', min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Expiry Date (Optional)"
+                name="expiry_date"
+                type="date"
+                value={formData.expiry_date}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
