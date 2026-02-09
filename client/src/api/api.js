@@ -87,6 +87,7 @@ export const productsApi = {
     if (search) url += `&search=${encodeURIComponent(search)}`;
     return apiFetch(url);
   },
+  getByBarcode: (barcode) => apiFetch(`/products/by-barcode/${barcode}`),
   getById: (id) => apiFetch(`/products/${id}`),
   create: (productData) =>
     apiFetch('/products', {

@@ -14,28 +14,48 @@ const DEFAULT_PRODUCTS = [
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [isEditing, setIsEditing] = useState(null);
-  const [formData, setFormData] = useState({ name: '', price: '', icon: '📦', stock: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    icon: '📦',
+    stock: '',
+  });
 
   useEffect(() => {
-    const savedProducts = JSON.parse(localStorage.getItem('super_mart_products'));
+    const savedProducts = JSON.parse(
+      localStorage.getItem('super_mart_products'),
+    );
     if (!savedProducts || savedProducts.length === 0) {
-      localStorage.setItem('super_mart_products', JSON.stringify(DEFAULT_PRODUCTS));
+      localStorage.setItem(
+        'super_mart_products',
+        JSON.stringify(DEFAULT_PRODUCTS),
+      );
       setProducts(DEFAULT_PRODUCTS);
     } else {
-      setProducts(savedProducts.map(p => ({ ...p, stock: p.stock || 0 })));
+      setProducts(savedProducts.map((p) => ({ ...p, stock: p.stock || 0 })));
     }
   }, []);
 
   const saveProducts = (updatedProducts) => {
     setProducts(updatedProducts);
-    localStorage.setItem('super_mart_products', JSON.stringify(updatedProducts));
+    localStorage.setItem(
+      'super_mart_products',
+      JSON.stringify(updatedProducts),
+    );
   };
 
   const handleAddOrUpdate = (e) => {
     e.preventDefault();
     if (isEditing) {
-      const updated = products.map(p => 
-        p.id === isEditing ? { ...p, ...formData, price: Number(formData.price), stock: Number(formData.stock) } : p
+      const updated = products.map((p) =>
+        p.id === isEditing
+          ? {
+              ...p,
+              ...formData,
+              price: Number(formData.price),
+              stock: Number(formData.stock),
+            }
+          : p,
       );
       saveProducts(updated);
       setIsEditing(null);
@@ -44,7 +64,7 @@ const Products = () => {
         id: Date.now(),
         ...formData,
         price: Number(formData.price),
-        stock: Number(formData.stock)
+        stock: Number(formData.stock),
       };
       saveProducts([...products, newProduct]);
     }
@@ -53,56 +73,77 @@ const Products = () => {
 
   const deleteProduct = (id) => {
     if (window.confirm('Delete this product?')) {
-      saveProducts(products.filter(p => p.id !== id));
+      saveProducts(products.filter((p) => p.id !== id));
     }
   };
 
   const startEdit = (product) => {
     setIsEditing(product.id);
-    setFormData({ name: product.name, price: product.price, icon: product.icon, stock: product.stock });
+    setFormData({
+      name: product.name,
+      price: product.price,
+      icon: product.icon,
+      stock: product.stock,
+    });
   };
 
   return (
     <div className="pos-container" style={{ flexDirection: 'column' }}>
       <h1>Product Management</h1>
-      
+
       <div className="pos-card" style={{ marginBottom: '20px' }}>
         <h3>{isEditing ? 'Edit Product' : 'Add New Product'}</h3>
-        <form onSubmit={handleAddOrUpdate} style={{ display: 'flex', gap: '10px', marginTop: '10px', alignItems: 'flex-end' }}>
+        <form
+          onSubmit={handleAddOrUpdate}
+          style={{
+            display: 'flex',
+            gap: '10px',
+            marginTop: '10px',
+            alignItems: 'flex-end',
+          }}
+        >
           <div style={{ flex: 2 }}>
             <label style={{ fontSize: '0.8rem' }}>Name</label>
-            <input 
+            <input
               required
               value={formData.name}
-              onChange={e => setFormData({...formData, name: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               placeholder="Product Name"
             />
           </div>
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: '0.8rem' }}>Price (₹)</label>
-            <input 
+            <input
               required
               type="number"
               value={formData.price}
-              onChange={e => setFormData({...formData, price: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, price: e.target.value })
+              }
               placeholder="Price"
             />
           </div>
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: '0.8rem' }}>Stock</label>
-            <input 
+            <input
               required
               type="number"
               value={formData.stock}
-              onChange={e => setFormData({...formData, stock: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, stock: e.target.value })
+              }
               placeholder="Qty"
             />
           </div>
           <div style={{ flex: 0.5 }}>
             <label style={{ fontSize: '0.8rem' }}>Icon</label>
-            <input 
+            <input
               value={formData.icon}
-              onChange={e => setFormData({...formData, icon: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, icon: e.target.value })
+              }
               placeholder="🛒"
               maxLength="2"
               style={{ textAlign: 'center' }}
@@ -112,7 +153,11 @@ const Products = () => {
             {isEditing ? 'Update' : 'Add'}
           </button>
           {isEditing && (
-            <button type="button" onClick={() => setIsEditing(null)} style={{ height: '45px' }}>
+            <button
+              type="button"
+              onClick={() => setIsEditing(null)}
+              style={{ height: '45px' }}
+            >
               Cancel
             </button>
           )}
@@ -121,9 +166,20 @@ const Products = () => {
 
       <div className="pos-card" style={{ flex: 1, overflowY: 'auto' }}>
         <h3>Product List</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            marginTop: '10px',
+          }}
+        >
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)' }}>
+            <tr
+              style={{
+                textAlign: 'left',
+                borderBottom: '2px solid var(--border)',
+              }}
+            >
               <th style={{ padding: '10px' }}>Icon</th>
               <th style={{ padding: '10px' }}>Name</th>
               <th style={{ padding: '10px' }}>Price</th>
@@ -132,29 +188,45 @@ const Products = () => {
             </tr>
           </thead>
           <tbody>
-            {products.map(product => (
-              <tr key={product.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '10px', fontSize: '1.5rem' }}>{product.icon}</td>
+            {products.map((product) => (
+              <tr
+                key={product.id}
+                style={{ borderBottom: '1px solid var(--border)' }}
+              >
+                <td style={{ padding: '10px', fontSize: '1.5rem' }}>
+                  {product.icon}
+                </td>
                 <td style={{ padding: '10px' }}>{product.name}</td>
                 <td style={{ padding: '10px' }}>₹{product.price}</td>
                 <td style={{ padding: '10px' }}>
-                  <span style={{ 
-                    fontWeight: 600, 
-                    color: product.stock < 10 ? 'var(--danger)' : 'var(--success)' 
-                  }}>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color:
+                        product.stock < 10 ? 'var(--danger)' : 'var(--success)',
+                    }}
+                  >
                     {product.stock}
                   </span>
                 </td>
                 <td style={{ padding: '10px', textAlign: 'right' }}>
-                  <button 
+                  <button
                     onClick={() => startEdit(product)}
-                    style={{ background: 'var(--bg)', marginRight: '5px', padding: '5px 10px' }}
+                    style={{
+                      background: 'var(--bg)',
+                      marginRight: '5px',
+                      padding: '5px 10px',
+                    }}
                   >
                     Edit
                   </button>
-                  <button 
+                  <button
                     onClick={() => deleteProduct(product.id)}
-                    style={{ background: 'transparent', color: 'var(--danger)', padding: '5px 10px' }}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--danger)',
+                      padding: '5px 10px',
+                    }}
                   >
                     Delete
                   </button>

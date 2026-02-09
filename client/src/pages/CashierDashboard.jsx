@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { productsApi, billsApi } from "../api/api";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { productsApi, billsApi } from '../api/api';
 import {
   Box,
   Grid,
@@ -23,7 +23,18 @@ import {
   DialogActions,
   ToggleButtonGroup,
   ToggleButton,
-} from "@mui/material";
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Autocomplete,
+  Popper,
+  List,
+  ListItem,
+  ListItemText,
+} from '@mui/material';
 import {
   Add as AddIcon,
   Remove as RemoveIcon,
@@ -32,119 +43,9 @@ import {
   ShoppingCart as CartIcon,
   Money as CashIcon,
   QrCode2 as UpiIcon,
-} from "@mui/icons-material";
+} from '@mui/icons-material';
 
-const ProductCard = React.memo(({ product, onAdd }) => {
-  const isOutOfStock = product.stock_qty <= 0;
-  const isLowStock = product.stock_qty < 10 && !isOutOfStock;
-
-  return (
-    <Grid item xs={6} sm={6} md={4} lg={3} sx={{ display: "flex" }}>
-      <Card
-        elevation={1}
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          width: "100%",
-          borderRadius: 2,
-          overflow: "hidden",
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          border: "1px solid",
-          borderColor: "divider",
-          "&:hover": {
-            transform: "translateY(-4px)",
-            boxShadow: "0 12px 20px -10px rgba(0,0,0,0.1)",
-            borderColor: "primary.light",
-          },
-        }}
-      >
-        <CardContent
-          sx={{
-            flex: "1 0 auto",
-            p: 2,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <Typography
-            variant="subtitle1"
-            sx={{
-              fontWeight: 700,
-              fontSize: "0.95rem",
-              lineHeight: 1.3,
-              height: "2.6rem", // Exactly 2 lines of text
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              mb: 1,
-            }}
-          >
-            {product.name}
-          </Typography>
-
-          <Box sx={{ mt: "auto" }}>
-            <Typography
-              variant="h6"
-              color="primary.main"
-              fontWeight={800}
-              sx={{ mb: 0.5 }}
-            >
-              ${parseFloat(product.selling_price).toFixed(2)}
-            </Typography>
-
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                minHeight: "1.5rem",
-              }}
-            >
-              {isOutOfStock ? (
-                <Typography
-                  variant="caption"
-                  color="error.main"
-                  fontWeight={800}
-                  sx={{ letterSpacing: "0.5px" }}
-                >
-                  OUT OF STOCK
-                </Typography>
-              ) : (
-                <Typography
-                  variant="caption"
-                  color={isLowStock ? "error.main" : "text.secondary"}
-                  fontWeight={isLowStock ? 700 : 500}
-                >
-                  Stock: {product.stock_qty}
-                </Typography>
-              )}
-            </Box>
-          </Box>
-        </CardContent>
-        <CardActions sx={{ p: 2, pt: 0 }}>
-          <Button
-            fullWidth
-            variant={isOutOfStock ? "outlined" : "contained"}
-            onClick={() => onAdd(product)}
-            disabled={isOutOfStock}
-            color={isOutOfStock ? "inherit" : "primary"}
-            disableElevation
-            sx={{
-              py: 1,
-              fontWeight: 700,
-              borderRadius: 1.5,
-              textTransform: "none",
-              fontSize: "0.875rem",
-            }}
-          >
-            {isOutOfStock ? "Unavailable" : "Add to Cart"}
-          </Button>
-        </CardActions>
-      </Card>
-    </Grid>
-  );
-});
+// ProductCard component removed as it's no longer used in the new layout
 
 const CashierDashboard = () => {
   const navigate = useNavigate();
@@ -152,70 +53,146 @@ const CashierDashboard = () => {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [status, setStatus] = useState({ type: "", message: "" });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [status, setStatus] = useState({ type: '', message: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
 
-  // Quantity Dialog State
-  const [quantityDialogOpen, setQuantityDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [quantityInput, setQuantityInput] = useState("");
-  const quantityInputRef = useRef(null);
+  // Barcode Scanning State
+  const [barcodeValue, setBarcodeValue] = useState('');
+  const barcodeInputRef = useRef(null);
 
-  const addToCart = useCallback((product) => {
-    setSelectedProduct(product);
-    setQuantityInput("");
-    setQuantityDialogOpen(true);
+  // Audio effects
+  const playBeep = useCallback(() => {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1);
   }, []);
 
-  const fetchProducts = useCallback(
-    async (term) => {
-      if (!term.trim()) {
-        setProducts([]);
-        return;
+  const playErrorSound = useCallback(() => {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.3);
+  }, []);
+
+  const addToCart = useCallback((product) => {
+    setCart((prevCart) => {
+      const existingItemIndex = prevCart.findIndex(
+        (item) => item.id === product.id,
+      );
+      if (existingItemIndex > -1) {
+        const newCart = [...prevCart];
+        newCart[existingItemIndex] = {
+          ...newCart[existingItemIndex],
+          quantity: newCart[existingItemIndex].quantity + 1,
+        };
+        return newCart;
+      } else {
+        return [...prevCart, { ...product, quantity: 1 }];
       }
-      setLoading(true);
+    });
+  }, []);
+
+  const fetchProducts = useCallback(async (term) => {
+    if (!term.trim()) {
+      setProducts([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await productsApi.getAll(1, 100, term);
+      setProducts(response.products || []);
+    } catch (err) {
+      console.error('Failed to fetch products', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleBarcodeSubmit = useCallback(
+    async (barcode) => {
+      if (!barcode.trim()) return;
       try {
-        const response = await productsApi.getAll(1, 100, term);
-        const fetchedProducts = response.products || [];
-        setProducts(fetchedProducts);
-
-        // Check if the search term matches any product's barcode exactly
-        const exactBarcodeMatch = fetchedProducts.find(
-          (p) => p.barcode && p.barcode.trim() === term.trim(),
-        );
-
-        if (exactBarcodeMatch) {
-          // Auto-open quantity modal for exact barcode match
-          addToCart(exactBarcodeMatch);
-          // Clear search to prepare for next scan
-          setSearchTerm("");
-          setProducts([]);
+        const product = await productsApi.getByBarcode(barcode.trim());
+        if (product) {
+          playBeep();
+          addToCart(product);
         }
       } catch (err) {
-        console.error("Failed to fetch products", err);
+        playErrorSound();
+        setStatus({ type: 'error', message: 'Product not found' });
+        setTimeout(() => setStatus({ type: '', message: '' }), 3000);
       } finally {
-        setLoading(false);
+        setBarcodeValue('');
       }
     },
-    [addToCart],
+    [playBeep, playErrorSound, addToCart],
   );
+
+  // Ensure barcode input is always focused when not interacting with other inputs
+  useEffect(() => {
+    const handleAutoFocus = () => {
+      const active = document.activeElement;
+      const isInput =
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable);
+
+      if (!isInput && barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
+    };
+
+    const focusInterval = setInterval(handleAutoFocus, 500);
+
+    const handleWindowClick = (e) => {
+      // If clicking on an input field or something that should handle its own focus, skip
+      if (
+        e.target.tagName === 'INPUT' ||
+        e.target.tagName === 'TEXTAREA' ||
+        e.target.closest('button')
+      ) {
+        return;
+      }
+      handleAutoFocus();
+    };
+
+    window.addEventListener('click', handleWindowClick);
+    return () => {
+      clearInterval(focusInterval);
+      window.removeEventListener('click', handleWindowClick);
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ctrl + Backspace to clear cart
-      if (e.ctrlKey && e.key === "Backspace") {
+      if (e.ctrlKey && e.key === 'Backspace') {
         e.preventDefault();
         if (cart.length > 0) {
           setCart([]);
-          setStatus({ type: "info", message: "Cart cleared" });
-          setTimeout(() => setStatus({ type: "", message: "" }), 2000);
+          setStatus({ type: 'info', message: 'Cart cleared' });
+          setTimeout(() => setStatus({ type: '', message: '' }), 2000);
         }
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cart]);
 
   useEffect(() => {
@@ -231,48 +208,27 @@ const CashierDashboard = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, fetchProducts]);
 
-  const handleQuantityDialogClose = useCallback(() => {
-    setQuantityDialogOpen(false);
-    setQuantityInput("");
-    setSelectedProduct(null);
-  }, []);
-
-  const handleQuantityConfirm = useCallback(() => {
-    const qty = quantityInput === "" ? 1 : parseInt(quantityInput, 10);
-
-    if (isNaN(qty) || qty <= 0) return;
-
-    const existingItem = cart.find((item) => item.id === selectedProduct.id);
-
-    if (existingItem) {
+  const updateQuantity = useCallback(
+    (productId, deltaOrQty, isManual = false) => {
       setCart((prevCart) =>
-        prevCart.map((item) =>
-          item.id === selectedProduct.id
-            ? { ...item, quantity: item.quantity + qty }
-            : item,
-        ),
+        prevCart.map((item) => {
+          if (item.id === productId) {
+            let newQty;
+            if (isManual) {
+              newQty = deltaOrQty === '' ? '' : parseInt(deltaOrQty, 10);
+              if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1))
+                return item;
+            } else {
+              newQty = Math.max(1, item.quantity + deltaOrQty);
+            }
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        }),
       );
-    } else {
-      setCart((prevCart) => [
-        ...prevCart,
-        { ...selectedProduct, quantity: qty },
-      ]);
-    }
-
-    handleQuantityDialogClose();
-  }, [cart, quantityInput, selectedProduct, handleQuantityDialogClose]);
-
-  const updateQuantity = useCallback((productId, delta) => {
-    setCart((prevCart) =>
-      prevCart.map((item) => {
-        if (item.id === productId) {
-          const newQty = Math.max(1, item.quantity + delta);
-          return { ...item, quantity: newQty };
-        }
-        return item;
-      }),
-    );
-  }, []);
+    },
+    [],
+  );
 
   const removeFromCart = useCallback((productId) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
@@ -283,10 +239,12 @@ const CashierDashboard = () => {
     0,
   );
 
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setProcessing(true);
-    setStatus({ type: "", message: "" });
+    setStatus({ type: '', message: '' });
 
     try {
       const items = cart.map((item) => ({
@@ -297,17 +255,17 @@ const CashierDashboard = () => {
         items,
         payment_method: paymentMethod,
         idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        business_date: new Date().toISOString().split("T")[0],
+        business_date: new Date().toISOString().split('T')[0],
       });
       setStatus({
-        type: "success",
-        message: "Transaction completed successfully",
+        type: 'success',
+        message: 'Transaction completed successfully',
       });
       setCart([]);
-      setPaymentMethod("CASH"); // Reset payment method after checkout
-      setTimeout(() => setStatus({ type: "", message: "" }), 3000);
+      setPaymentMethod('CASH'); // Reset payment method after checkout
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     } catch (err) {
-      setStatus({ type: "error", message: err.message || "Checkout failed" });
+      setStatus({ type: 'error', message: err.message || 'Checkout failed' });
     } finally {
       setProcessing(false);
     }
@@ -316,224 +274,347 @@ const CashierDashboard = () => {
   // Removal of client-side filtering logic
 
   return (
-    <Box>
-      <Box sx={{ mb: 4 }}>
+    <Box
+      sx={{
+        height: { xs: 'auto', lg: '100%' },
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden', // Prevent outer scroll on desktop
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          mb: 2,
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          gap: 2,
+          flexShrink: 0,
+        }}
+      >
         <Typography
           variant="h4"
-          fontWeight={700}
-          gutterBottom
-          sx={{ fontSize: { xs: "1.75rem", sm: "2.125rem" } }}
+          fontWeight={900}
+          sx={{
+            color: 'text.primary',
+            fontSize: { xs: '1.5rem', sm: '1.8rem', lg: '2rem' },
+          }}
         >
           Cashier Terminal
         </Typography>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
+        <Button
+          variant="outlined"
+          color="secondary"
+          startIcon={<RemoveIcon />}
+          onClick={() => navigate('/cashier/return')}
+          sx={{ fontWeight: 700, borderRadius: 2, whiteSpace: 'nowrap' }}
         >
-          <Typography variant="body2" color="text.secondary">
-            Select products to add to cart
-          </Typography>
-          <Button
-            variant="outlined"
-            color="secondary"
-            startIcon={<RemoveIcon />}
-            onClick={() => navigate("/cashier/return")}
-            sx={{ fontWeight: 700, borderRadius: 2 }}
-          >
-            Manage Returns
-          </Button>
-        </Box>
+          Manage Returns
+        </Button>
       </Box>
 
+      {/* Main Content Area */}
       <Box
         sx={{
-          display: "flex",
-          flexDirection: { xs: "column", lg: "row" },
+          display: 'flex',
+          flexDirection: { xs: 'column', lg: 'row' },
           gap: 3,
-          alignItems: "flex-start",
+          flexGrow: 1,
+          minHeight: 0, // CRITICAL for nested flex scrolling
+          overflow: { xs: 'visible', lg: 'hidden' },
         }}
       >
-        {/* Product Section */}
-        <Box sx={{ flex: 1, minWidth: { xs: "100%", lg: 600 }, width: "100%" }}>
+        {/* Left Section (Cart) */}
+        <Box
+          sx={{
+            flex: { xs: '1 1 auto', lg: 1 }, // Use flex: 1 to fill available space
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            minWidth: 0,
+            height: '100%',
+          }}
+        >
+          {/* Search Section */}
           <Paper
+            elevation={0}
             sx={{
-              p: { xs: 2, sm: 3 },
-              mb: 3,
-              position: { xs: "sticky", sm: "static" },
-              top: { xs: 70, sm: "auto" },
-              zIndex: 10,
-              boxShadow: { xs: 3, sm: 1 },
+              p: 0,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              flexShrink: 0,
             }}
           >
-            <TextField
-              fullWidth
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onFocus={(e) => e.target.select()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && searchTerm.trim()) {
-                  // Trigger immediate search on Enter (useful for barcode scanners)
-                  fetchProducts(searchTerm);
+            <Autocomplete
+              openOnFocus
+              clearOnBlur
+              handleHomeEndKeys
+              options={products}
+              inputValue={searchTerm}
+              value={null}
+              getOptionLabel={(option) => option.name}
+              filterOptions={(x) => x} // Filtering handled by API
+              onInputChange={(event, newInputValue) => {
+                setSearchTerm(newInputValue);
+              }}
+              onChange={(event, newValue) => {
+                if (newValue) {
+                  addToCart(newValue);
+                  setSearchTerm('');
                 }
               }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
+              renderOption={(props, option) => {
+                const { key, ...optionProps } = props;
+                return (
+                  <ListItem key={option.id} {...optionProps} divider>
+                    <ListItemText
+                      primary={
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Typography variant="body1" fontWeight={600}>
+                            {option.name}
+                          </Typography>
+                          <Typography
+                            variant="body1"
+                            color="primary.main"
+                            fontWeight={700}
+                          >
+                            ₹{parseFloat(option.selling_price).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Barcode: {option.barcode}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Stock: {option.stock_qty}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                );
               }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  placeholder="Search product by name or scan barcode"
+                  variant="outlined"
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon color="action" />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2,
+                      '& fieldset': { border: 'none' },
+                      py: 0.5,
+                    },
+                    endAdornment: (
+                      <React.Fragment>
+                        {loading ? (
+                          <CircularProgress color="inherit" size={20} />
+                        ) : null}
+                        {params.InputProps.endAdornment}
+                      </React.Fragment>
+                    ),
+                  }}
+                />
+              )}
+              noOptionsText={
+                searchTerm ? 'No products found' : 'Search to see results'
+              }
             />
           </Paper>
 
-          <Grid container spacing={2}>
-            {!searchTerm.trim() ? (
-              <Grid item xs={12}>
-                <Box sx={{ py: 8, textAlign: "center", opacity: 0.5 }}>
-                  <SearchIcon sx={{ fontSize: 48, mb: 2 }} />
-                  <Typography variant="body1">
-                    Scan barcode or type name to search
-                  </Typography>
-                </Box>
-              </Grid>
-            ) : loading ? (
-              <Grid item xs={12}>
-                <Box sx={{ py: 8, textAlign: "center" }}>
-                  <CircularProgress size={32} />
-                </Box>
-              </Grid>
-            ) : products.length === 0 ? (
-              <Grid item xs={12}>
-                <Box sx={{ py: 8, textAlign: "center", opacity: 0.5 }}>
-                  <Typography variant="body1">
-                    No products found for "{searchTerm}"
-                  </Typography>
-                </Box>
-              </Grid>
-            ) : (
-              products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAdd={addToCart}
-                />
-              ))
-            )}
-          </Grid>
-        </Box>
+          {/* Hidden Barcode Input for background scanning */}
+          <input
+            ref={barcodeInputRef}
+            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+            value={barcodeValue}
+            onChange={(e) => setBarcodeValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleBarcodeSubmit(barcodeValue);
+              }
+            }}
+            autoFocus
+          />
 
-        {/* Cart Section */}
-        <Box
-          sx={{
-            width: { xs: "100%", lg: 360 },
-            position: { xs: "relative", lg: "sticky" },
-            top: { lg: 80 },
-          }}
-        >
-          <Paper sx={{ p: { xs: 2, sm: 3 } }}>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                mb: 3,
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <CartIcon color="primary" />
-                <Typography variant="h6" fontWeight={700}>
-                  Cart ({cart.length})
-                </Typography>
-              </Box>
-              {cart.length > 0 && (
-                <Button
-                  size="small"
-                  color="error"
-                  onClick={() => setCart([])}
-                  sx={{ minWidth: "auto", textTransform: "none" }}
-                >
-                  Clear
-                </Button>
-              )}
-            </Box>
-
-            <Divider sx={{ mb: 2 }} />
-
-            {status.message && (
-              <Alert severity={status.type} sx={{ mb: 2 }}>
-                {status.message}
-              </Alert>
-            )}
-
-            {cart.length === 0 ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: 480,
-                  color: "text.secondary",
-                }}
-              >
-                <CartIcon sx={{ fontSize: 64, mb: 2, opacity: 0.1 }} />
-                <Typography variant="body1" fontWeight={500}>
-                  Cart is empty
-                </Typography>
-                <Typography variant="caption">
-                  Select products to start building a bill
-                </Typography>
-              </Box>
-            ) : (
-              <>
-                <Box sx={{ maxHeight: 400, overflow: "auto", mb: 3 }}>
-                  {cart.map((item) => (
-                    <Box
-                      key={item.id}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        mb: 2,
-                        pb: 2,
-                        borderBottom: 1,
-                        borderColor: "divider",
-                      }}
+          {/* Cart Table Section */}
+          <TableContainer
+            component={Paper}
+            elevation={0}
+            sx={{
+              flexGrow: 1,
+              minHeight: 0,
+              overflow: 'auto',
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      minWidth: 200,
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    Item Name
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
+                  >
+                    Price
+                  </TableCell>
+                  <TableCell
+                    align="center"
+                    sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
+                  >
+                    Quantity
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
+                  >
+                    Line Total
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ bgcolor: 'background.paper' }}
+                  ></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {cart.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      align="center"
+                      sx={{ py: 10, borderBottom: 'none' }}
                     >
-                      <Box sx={{ flex: 1 }}>
+                      <Box sx={{ opacity: 0.5 }}>
+                        <CartIcon sx={{ fontSize: 48, mb: 1 }} />
+                        <Typography>Cart is empty</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  cart.map((item) => (
+                    <TableRow key={item.id} hover>
+                      <TableCell sx={{ minWidth: 200 }}>
                         <Typography variant="body2" fontWeight={600}>
                           {item.name}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          ₹{item.selling_price} each
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <IconButton
-                          size="small"
-                          onClick={() => updateQuantity(item.id, -1)}
-                        >
-                          <RemoveIcon fontSize="small" />
-                        </IconButton>
                         <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          sx={{ minWidth: 20, textAlign: "center" }}
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: 'block', mt: -0.5 }}
                         >
-                          {item.quantity}
+                          {item.barcode}
                         </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => updateQuantity(item.id, 1)}
+                        {item.quantity > item.stock_qty && (
+                          <Typography
+                            variant="caption"
+                            color="error"
+                            sx={{ display: 'block' }}
+                          >
+                            Low stock: only {item.stock_qty} available
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        ₹{parseFloat(item.selling_price).toFixed(2)}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 1,
+                          }}
                         >
-                          <AddIcon fontSize="small" />
-                        </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => updateQuantity(item.id, -1)}
+                            sx={{ border: '1px solid', borderColor: 'divider' }}
+                          >
+                            <RemoveIcon fontSize="small" />
+                          </IconButton>
+                          <TextField
+                            size="small"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateQuantity(item.id, e.target.value, true)
+                            }
+                            onFocus={(e) => e.target.select()}
+                            onBlur={(e) => {
+                              if (
+                                e.target.value === '' ||
+                                parseInt(e.target.value, 10) < 1
+                              ) {
+                                updateQuantity(item.id, 1, true);
+                              }
+                            }}
+                            inputProps={{
+                              style: {
+                                textAlign: 'center',
+                                padding: '4px 0',
+                                width: '40px',
+                                fontWeight: 700,
+                                fontSize: '0.875rem',
+                              },
+                              inputMode: 'numeric',
+                              pattern: '[0-9]*',
+                            }}
+                            variant="outlined"
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 1.5,
+                                backgroundColor: 'rgba(0,0,0,0.02)',
+                                '&:hover fieldset': {
+                                  borderColor: 'primary.light',
+                                },
+                              },
+                              '& .MuiOutlinedInput-notchedOutline': {
+                                border: '1px solid',
+                                borderColor: 'divider',
+                              },
+                            }}
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={() => updateQuantity(item.id, 1)}
+                            sx={{ border: '1px solid', borderColor: 'divider' }}
+                          >
+                            <AddIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>
+                        ₹{(item.selling_price * item.quantity).toFixed(2)}
+                      </TableCell>
+                      <TableCell align="right">
                         <IconButton
                           size="small"
                           color="error"
@@ -541,134 +622,183 @@ const CashierDashboard = () => {
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
-                      </Box>
-                    </Box>
-                  ))}
-                </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
 
-                <Divider sx={{ mb: 2 }} />
+        {/* Right Section (30%) - Payment Summary & Actions */}
+        <Box
+          sx={{
+            flex: { xs: '1 1 auto', lg: '0 0 30%' },
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0,
+            height: '100%',
+          }}
+        >
+          <Paper
+            elevation={1}
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Typography variant="h6" fontWeight={800} gutterBottom>
+              Bill Summary
+            </Typography>
 
-                <Box sx={{ mb: 3 }}>
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight={600}
-                    sx={{ mb: 1.5 }}
-                  >
-                    Payment Method
-                  </Typography>
-                  <ToggleButtonGroup
-                    value={paymentMethod}
-                    exclusive
-                    onChange={(e, newMethod) => {
-                      if (newMethod !== null) {
-                        setPaymentMethod(newMethod);
-                      }
-                    }}
-                    fullWidth
-                    size="small"
-                  >
-                    <ToggleButton value="CASH">
-                      <CashIcon sx={{ mr: 1, fontSize: 18 }} />
-                      Cash
-                    </ToggleButton>
-                    <ToggleButton value="UPI">
-                      <UpiIcon sx={{ mr: 1, fontSize: 18 }} />
-                      UPI
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-                </Box>
+            <Box
+              sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography color="text.secondary">Total Items</Typography>
+                <Typography fontWeight={600}>{cart.length}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography color="text.secondary">Total Quantity</Typography>
+                <Typography fontWeight={600}>{totalItems}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography color="text.secondary">Subtotal</Typography>
+                <Typography fontWeight={600}>₹{total.toFixed(2)}</Typography>
+              </Box>
 
-                <Divider sx={{ mb: 2 }} />
+              <Divider sx={{ my: 1 }} />
 
-                <Box
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  mb: 1,
+                }}
+              >
+                <Typography variant="h6" fontWeight={800}>
+                  Total Payable
+                </Typography>
+                <Typography variant="h4" fontWeight={900} color="primary.main">
+                  ₹{total.toFixed(2)}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                Payment Method
+              </Typography>
+              <ToggleButtonGroup
+                value={paymentMethod}
+                exclusive
+                onChange={(e, newMethod) => {
+                  if (newMethod !== null) setPaymentMethod(newMethod);
+                }}
+                fullWidth
+                color="primary"
+                size="small"
+              >
+                <ToggleButton
+                  value="CASH"
                   sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    mb: 3,
+                    py: 1,
+                    borderRadius: 2,
+                    border: '1px solid !important',
+                    borderColor: 'divider',
+                    '&.Mui-selected': {
+                      borderColor: 'primary.main !important',
+                      bgcolor: 'primary.action.selected',
+                    },
                   }}
                 >
-                  <Typography variant="h6" fontWeight={700}>
-                    Total
-                  </Typography>
-                  <Typography variant="h6" fontWeight={700} color="primary">
-                    ₹{total.toFixed(2)}
-                  </Typography>
-                </Box>
-
-                <Button
-                  fullWidth
-                  variant="contained"
-                  size="large"
-                  disabled={processing}
-                  onClick={handleCheckout}
-                  sx={{ py: 1.5 }}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CashIcon sx={{ fontSize: 18 }} />
+                    <Typography
+                      variant="button"
+                      fontWeight={700}
+                      sx={{ fontSize: '0.75rem' }}
+                    >
+                      CASH
+                    </Typography>
+                  </Box>
+                </ToggleButton>
+                <ToggleButton
+                  value="UPI"
+                  sx={{
+                    py: 1,
+                    borderRadius: 2,
+                    border: '1px solid !important',
+                    borderColor: 'divider',
+                    '&.Mui-selected': {
+                      borderColor: 'primary.main !important',
+                      bgcolor: 'primary.action.selected',
+                    },
+                  }}
                 >
-                  {processing ? (
-                    <CircularProgress size={24} />
-                  ) : (
-                    "Complete Checkout"
-                  )}
-                </Button>
-              </>
-            )}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <UpiIcon sx={{ fontSize: 18 }} />
+                    <Typography
+                      variant="button"
+                      fontWeight={700}
+                      sx={{ fontSize: '0.75rem' }}
+                    >
+                      UPI
+                    </Typography>
+                  </Box>
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+
+            <Box sx={{ mt: 'auto', pt: 3 }}>
+              <Button
+                fullWidth
+                variant="contained"
+                size="large"
+                disabled={processing || cart.length === 0}
+                onClick={handleCheckout}
+                sx={{
+                  py: 1.5,
+                  borderRadius: 2,
+                  fontSize: '1.1rem',
+                  fontWeight: 800,
+                  textTransform: 'none',
+                }}
+              >
+                {processing ? (
+                  <CircularProgress size={28} color="inherit" />
+                ) : (
+                  `Checkout ₹${total.toFixed(2)}`
+                )}
+              </Button>
+            </Box>
           </Paper>
         </Box>
       </Box>
 
-      {/* Quantity Dialog */}
-      <Dialog
-        open={quantityDialogOpen}
-        onClose={handleQuantityDialogClose}
-        maxWidth="xs"
-        fullWidth
-        TransitionProps={{
-          onEntered: () => {
-            quantityInputRef.current?.focus();
-          },
-        }}
-      >
-        <DialogTitle sx={{ pb: 1 }}>{selectedProduct?.name}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Enter quantity to add to cart
-          </Typography>
-          <TextField
-            autoFocus
-            fullWidth
-            inputRef={quantityInputRef}
-            label="Quantity"
-            type="text"
-            value={quantityInput}
-            onChange={(e) => setQuantityInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleQuantityConfirm();
-              }
-            }}
-            inputProps={{
-              inputMode: "numeric",
-              pattern: "[0-9]*",
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleQuantityDialogClose} color="inherit">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleQuantityConfirm}
-            variant="contained"
-            disabled={
-              quantityInput &&
-              (isNaN(parseInt(quantityInput, 10)) ||
-                parseInt(quantityInput, 10) <= 0)
-            }
-          >
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Global Status Alert */}
+      {status.message && (
+        <Alert
+          severity={status.type}
+          onClose={() => setStatus({ type: '', message: '' })}
+          sx={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            zIndex: 2000,
+            boxShadow: 3,
+          }}
+        >
+          {status.message}
+        </Alert>
+      )}
     </Box>
   );
 };

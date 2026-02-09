@@ -198,7 +198,6 @@ export const createBill = asyncHandler(async (req, res) => {
 export const getBillById = asyncHandler(async (req, res) => {
   const { bill_id } = req.params;
   const { limit = 10, page = 1 } = req.query;
-  console.log(bill_id);
 
   const { rows } = await pool.query(
     `SELECT
@@ -344,8 +343,6 @@ export const voidBill = asyncHandler(async (req, res) => {
       "UPDATE bills SET is_void = TRUE, voided_at = NOW(), void_by = $1 WHERE id = $2",
       [user_id, bill_id],
     );
-
-    console.log(bill_id);
 
     await logBillEvent({
       client,

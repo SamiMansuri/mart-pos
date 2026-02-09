@@ -163,11 +163,11 @@ const StockEntry = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    fullWidth
                     label="Search Product"
                     required
                     placeholder="Enter product name or barcode"
                     sx={{
+                      minWidth: '260px',
                       '& .MuiInputBase-root': {
                         fontSize: '1.1rem',
                         py: 0.5,
@@ -206,7 +206,20 @@ const StockEntry = () => {
                     sx={{ display: 'flex', justifyContent: 'space-between' }}
                   >
                     {/* <span>Selected: {selectedProduct.name}</span> */}
-                    <span>Current Stock: {selectedProduct.stock_qty}</span>
+                    <Box>
+                      <Typography component="span" sx={{ mr: 2 }}>
+                        Current Stock: {selectedProduct.stock_qty || 0}
+                      </Typography>
+                      {selectedProduct.latest_batch && (
+                        <Typography
+                          component="span"
+                          color="secondary"
+                          fontWeight={600}
+                        >
+                          Latest Batch: {selectedProduct.latest_batch}
+                        </Typography>
+                      )}
+                    </Box>
                   </Typography>
                 </Box>
               </Grid>

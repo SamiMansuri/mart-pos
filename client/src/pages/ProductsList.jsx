@@ -250,7 +250,9 @@ const ProductsList = () => {
                     {isAdminUser && (
                       <TableCell align="right">
                         <Typography variant="body2">
-                          {formatCurrency(product.cost_price)}
+                          {product.cost_price
+                            ? formatCurrency(product.cost_price)
+                            : '-'}
                         </Typography>
                       </TableCell>
                     )}
@@ -271,7 +273,7 @@ const ProductsList = () => {
                           product.stock_qty < 10 ? 'error.main' : 'text.primary'
                         }
                       >
-                        {product.stock_qty}
+                        {product.stock_qty || 0}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">

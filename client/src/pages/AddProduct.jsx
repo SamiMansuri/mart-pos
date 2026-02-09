@@ -61,7 +61,7 @@ const AddProduct = () => {
 
       // Redirect after a brief delay
       setTimeout(() => {
-        navigate('/admin');
+        navigate('/admin/products');
       }, 1500);
     } catch (err) {
       console.error('Failed to add product:', err);
