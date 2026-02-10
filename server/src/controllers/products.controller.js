@@ -3,6 +3,7 @@ import pool from "../config/db.config.js";
 import { getSuccessResponse } from "../utils/response.util.js";
 import { logEvent } from "../services/logs.service.js";
 import { withTransaction } from "../utils/transaction.util.js";
+import createHttpError from "http-errors";
 
 export const getAllProducts = asyncHandler(async (req, res) => {
   const page = Math.max(parseInt(req.query.page) || 1, 1);
@@ -28,17 +29,27 @@ export const getAllProducts = asyncHandler(async (req, res) => {
 
   // Projection based on role
   const isAdmin = req.user.role === "ADMIN";
-  const projection = isAdmin
-    ? "*"
-    : "id, name, barcode, selling_price, stock_qty, created_at";
-
   // Data query
   const productsQuery = `
-    SELECT ${projection}
-    FROM products
-    ${whereClause}
-    ORDER BY created_at DESC
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    SELECT 
+      p.id, p.name, p.barcode, p.selling_price,
+      s.stock_qty, lb.batch_no as latest_batch ${isAdmin ? ", s.cost_price, p.updated_at, p.updated_by, p.created_by, p.created_at" : ""}
+    FROM products p
+    LEFT JOIN (
+      SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
+      FROM product_batches 
+      GROUP BY product_id
+    ) s ON p.id = s.product_id
+    LEFT JOIN LATERAL (
+      SELECT batch_no
+      FROM product_batches pb
+      WHERE pb.product_id = p.id
+      ORDER BY pb.created_at DESC
+      LIMIT 1
+    ) lb ON true
+    ${search ? `WHERE (p.name ILIKE $1 OR p.barcode ILIKE $1)` : ""}
+    ORDER BY p.created_at DESC
+    LIMIT $${search ? 2 : 1} OFFSET $${search ? 3 : 2}
   `;
 
   values.push(limit, offset);
@@ -74,13 +85,56 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   );
 });
 
+export const getProductByBarcode = asyncHandler(async (req, res) => {
+  const { barcode } = req.params;
+  const isAdmin = req.user.role === "ADMIN";
+  const fields = isAdmin
+    ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date"
+    : "p.id, p.name, p.barcode, p.selling_price, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
+
+  const query = `
+    SELECT ${fields} 
+    FROM products p 
+    LEFT JOIN (
+      SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
+      FROM product_batches 
+      GROUP BY product_id
+    ) s ON p.id = s.product_id
+    LEFT JOIN product_batches b ON p.id = b.product_id AND b.batch_no = 'INITIAL'
+    WHERE p.barcode = $1
+  `;
+  const { rows } = await pool.query(query, [barcode]);
+
+  if (rows.length === 0) {
+    return res.status(404).json({ message: "Product not found" });
+  }
+
+  res.json(
+    getSuccessResponse({
+      data: rows[0],
+      message: "Product fetched successfully",
+      status: 200,
+    }),
+  );
+});
+
 export const getProductById = asyncHandler(async (req, res) => {
   const isAdmin = req.user.role === "ADMIN";
-  const projection = isAdmin
-    ? "*"
-    : "id, name, barcode, selling_price, stock_qty, created_at";
+  const fields = isAdmin
+    ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date"
+    : "p.id, p.name, p.barcode, p.selling_price, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
 
-  const query = `SELECT ${projection} FROM products WHERE id = $1`;
+  const query = `
+    SELECT ${fields} 
+    FROM products p 
+    LEFT JOIN (
+      SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
+      FROM product_batches 
+      GROUP BY product_id
+    ) s ON p.id = s.product_id
+    LEFT JOIN product_batches b ON p.id = b.product_id AND b.batch_no = 'INITIAL'
+    WHERE p.id = $1
+  `;
   const { rows } = await pool.query(query, [req.params.product_id]);
 
   if (rows.length === 0) {
@@ -100,71 +154,96 @@ export const createProduct = asyncHandler(async (req, res) => {
   const {
     product_name: name,
     barcode,
-    cost_price,
     selling_price,
-    stock_qty,
+    batch_no,
+    quantity,
+    cost_price,
+    expiry_date,
   } = req.body;
   const { user_id } = req.user;
 
-  console.log(req.user);
-
   const result = await withTransaction(async (client) => {
-    const query =
-      "INSERT INTO products (name, barcode, cost_price, selling_price, stock_qty, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
-    const { rows } = await client.query(query, [
-      name,
-      barcode || null,
-      cost_price,
-      selling_price,
-      stock_qty ?? 0,
-      user_id,
-    ]);
+    let product;
 
-    await client.query(
-      `
-      INSERT INTO stock_movements
-        (product_id, quantity, movement_type, reference, created_by)
-      VALUES
-        ($1, $2, $3, $4, $5)
-      `,
-      [rows[0].id, stock_qty ?? 0, "IN", "INITIAL_STOCK", user_id],
-    );
+    try {
+      // 1. Create Product
+      const productRes = await client.query(
+        `
+        INSERT INTO products (name, barcode, selling_price, created_by)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+        `,
+        [name, barcode || null, selling_price, user_id],
+      );
 
-    await logEvent(client, "PRODUCT_CREATED", user_id, "PRODUCT", rows[0].id);
+      product = productRes.rows[0];
 
-    return rows[0];
+      // 2. Create Initial Batch
+      const initialBatchNo = batch_no || "INITIAL";
+      const initialQty = quantity || 0;
+      const initialCost = cost_price || 0;
+
+      const batchRes = await client.query(
+        `
+        INSERT INTO product_batches (product_id, batch_no, quantity, cost_price, expiry_date, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+        `,
+        [
+          product.id,
+          initialBatchNo,
+          initialQty,
+          initialCost,
+          expiry_date || null,
+          user_id,
+        ],
+      );
+
+      const batch = batchRes.rows[0];
+
+      // 3. Record Stock Movement if quantity is provided
+      if (initialQty > 0) {
+        await client.query(
+          `
+          INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by, batch_id)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          `,
+          [product.id, initialQty, "IN", "INITIAL_STOCK", user_id, batch.id],
+        );
+      }
+    } catch (err) {
+      if (err.code === "23505") {
+        throw createHttpError(
+          409,
+          "Product with same name or barcode already exists",
+        );
+      }
+      throw err;
+    }
+
+    await logEvent(client, "PRODUCT_CREATED", user_id, "PRODUCT", product.id);
+
+    return product;
   });
 
-  res.json(
+  res.status(201).json(
     getSuccessResponse({
       data: result,
       message: "Product created successfully",
-      status: 201,
     }),
   );
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const {
-    product_name: name,
-    barcode,
-    cost_price,
-    selling_price,
-    stock_qty,
-  } = req.body;
+  const { product_name: name, barcode, selling_price } = req.body;
 
   const { user_id } = req.user;
   const productId = req.params.product_id;
 
   const result = await withTransaction(async (client) => {
-    /* Lock & fetch existing product */
+    /* Fetch existing product to verify existence */
     const { rows } = await client.query(
-      `
-      SELECT name, barcode, cost_price, selling_price, stock_qty
-      FROM products
-      WHERE id = $1
-      FOR UPDATE
-      `,
+      "SELECT * FROM products WHERE id = $1",
       [productId],
     );
 
@@ -181,49 +260,18 @@ export const updateProduct = asyncHandler(async (req, res) => {
       SET
         name = COALESCE($1, name),
         barcode = COALESCE($2, barcode),
-        cost_price = COALESCE($3, cost_price),
-        selling_price = COALESCE($4, selling_price),
-        updated_by = $5,
+        selling_price = COALESCE($3, selling_price),
+        updated_by = $4,
         updated_at = NOW()
-      WHERE id = $6
+      WHERE id = $5
       RETURNING *
       `,
-      [name, barcode ?? null, cost_price, selling_price, user_id, productId],
+      [name, barcode ?? null, selling_price, user_id, productId],
     );
 
     const updatedProduct = updateRes.rows[0];
 
-    /* Handle stock movement (ONLY if stock_qty provided) */
-    if (typeof stock_qty === "number" && stock_qty !== oldProduct.stock_qty) {
-      const diff = stock_qty - oldProduct.stock_qty;
-
-      await client.query(
-        `
-        UPDATE products
-        SET stock_qty = $1
-        WHERE id = $2
-        `,
-        [stock_qty, productId],
-      );
-
-      await client.query(
-        `
-        INSERT INTO stock_movements
-          (product_id, quantity, movement_type, reference, created_by)
-        VALUES
-          ($1, $2, $3, $4, $5)
-        `,
-        [
-          productId,
-          Math.abs(diff),
-          diff > 0 ? "IN" : "OUT",
-          "ADMIN_STOCK_UPDATE",
-          user_id,
-        ],
-      );
-    }
-
-    /* Log product update with old vs new */
+    /* Log product update with old vs new metadata */
     await logEvent(
       client,
       "PRODUCT_UPDATED",
@@ -235,17 +283,12 @@ export const updateProduct = asyncHandler(async (req, res) => {
         old: {
           name: oldProduct.name,
           barcode: oldProduct.barcode,
-          cost_price: oldProduct.cost_price,
           selling_price: oldProduct.selling_price,
-          stock_qty: oldProduct.stock_qty,
         },
         new: {
           name: updatedProduct.name,
           barcode: updatedProduct.barcode,
-          cost_price: updatedProduct.cost_price,
           selling_price: updatedProduct.selling_price,
-          stock_qty:
-            typeof stock_qty === "number" ? stock_qty : oldProduct.stock_qty,
         },
       },
     );
@@ -257,7 +300,6 @@ export const updateProduct = asyncHandler(async (req, res) => {
     getSuccessResponse({
       data: result,
       message: "Product updated successfully",
-      status: 200,
     }),
   );
 });

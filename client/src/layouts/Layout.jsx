@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useState } from 'react';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
@@ -15,7 +15,7 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-} from "@mui/material";
+} from '@mui/material';
 import {
   Store as StoreIcon,
   Logout as LogoutIcon,
@@ -25,9 +25,10 @@ import {
   Inventory as InventoryIcon,
   People as PeopleIcon,
   Menu as MenuIcon,
-} from "@mui/icons-material";
-import { isAdmin } from "../utils/auth.utils";
-import { authApi } from "../api/api";
+  BarChart as ReportsIcon,
+} from '@mui/icons-material';
+import { isAdmin } from '../utils/auth.utils';
+import { authApi } from '../api/api';
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -42,20 +43,21 @@ const Layout = () => {
     try {
       await authApi.logout();
     } catch (err) {
-      console.error("Server-side logout failed:", err);
+      console.error('Server-side logout failed:', err);
     } finally {
-      localStorage.removeItem("token");
-      navigate("/login");
+      localStorage.removeItem('token');
+      navigate('/login');
     }
   };
 
   const getCurrentTab = () => {
-    if (location.pathname.startsWith("/admin/users")) return "/admin/users";
-    if (location.pathname.startsWith("/admin/products"))
-      return "/admin/products";
-    if (location.pathname.startsWith("/admin")) return "/admin";
-    if (location.pathname.startsWith("/cashier")) return "/cashier";
-    if (location.pathname.startsWith("/history")) return "/history";
+    if (location.pathname.startsWith('/admin/reports')) return '/admin/reports';
+    if (location.pathname.startsWith('/admin/users')) return '/admin/users';
+    if (location.pathname.startsWith('/admin/products'))
+      return '/admin/products';
+    if (location.pathname.startsWith('/admin')) return '/admin';
+    if (location.pathname.startsWith('/cashier')) return '/cashier';
+    if (location.pathname.startsWith('/history')) return '/history';
     return false;
   };
 
@@ -64,31 +66,32 @@ const Layout = () => {
   const menuItems = [
     ...(showAdminTab
       ? [
-          { text: "Dashboard", icon: <AdminIcon />, path: "/admin" },
+          { text: 'Dashboard', icon: <AdminIcon />, path: '/admin' },
           {
-            text: "Inventory",
+            text: 'Inventory',
             icon: <InventoryIcon />,
-            path: "/admin/products",
+            path: '/admin/products',
           },
-          { text: "Employees", icon: <PeopleIcon />, path: "/admin/users" },
+          { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
+          { text: 'Employees', icon: <PeopleIcon />, path: '/admin/users' },
         ]
       : []),
-    { text: "Cashier", icon: <CashierIcon />, path: "/cashier" },
-    { text: "History", icon: <HistoryIcon />, path: "/history" },
+    { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
+    { text: 'History', icon: <HistoryIcon />, path: '/history' },
   ];
 
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: "center" }}>
+    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
       <Box
         sx={{
           py: 2,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           gap: 1,
         }}
       >
-        <StoreIcon sx={{ fontSize: 28, color: "primary.main" }} />
+        <StoreIcon sx={{ fontSize: 28, color: 'primary.main' }} />
         <Typography variant="h6" fontWeight={700} color="primary">
           Family Mart POS
         </Typography>
@@ -102,14 +105,14 @@ const Layout = () => {
               to={item.path}
               selected={getCurrentTab() === item.path}
               sx={{
-                "&.Mui-selected": {
-                  bgcolor: "primary.main",
-                  color: "white",
-                  "&:hover": {
-                    bgcolor: "primary.dark",
+                '&.Mui-selected': {
+                  bgcolor: 'primary.main',
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
                   },
-                  "& .MuiListItemIcon-root": {
-                    color: "white",
+                  '& .MuiListItemIcon-root': {
+                    color: 'white',
                   },
                 },
               }}
@@ -135,16 +138,16 @@ const Layout = () => {
   );
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <AppBar position="sticky" color="default" elevation={0}>
-        <Toolbar sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Toolbar sx={{ borderBottom: 1, borderColor: 'divider' }}>
           {/* Hamburger Menu - Show on mobile and tablet */}
           <IconButton
             color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { lg: "none" } }}
+            sx={{ mr: 2, display: { lg: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
@@ -152,30 +155,30 @@ const Layout = () => {
           {/* Logo and Title */}
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
+              display: 'flex',
+              alignItems: 'center',
               gap: 1.5,
               flexGrow: 1,
             }}
           >
             <StoreIcon
-              sx={{ fontSize: { xs: 24, sm: 28 }, color: "primary.main" }}
+              sx={{ fontSize: { xs: 24, sm: 28 }, color: 'primary.main' }}
             />
             <Typography
               variant="h6"
               fontWeight={700}
               color="primary"
-              sx={{ fontSize: { xs: "1rem", sm: "1.25rem" } }}
+              sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
             >
               <Box
                 component="span"
-                sx={{ display: { xs: "none", sm: "inline" } }}
+                sx={{ display: { xs: 'none', sm: 'inline' } }}
               >
                 Family Mart POS
               </Box>
               <Box
                 component="span"
-                sx={{ display: { xs: "inline", sm: "none" } }}
+                sx={{ display: { xs: 'inline', sm: 'none' } }}
               >
                 Family Mart
               </Box>
@@ -183,15 +186,15 @@ const Layout = () => {
           </Box>
 
           {/* Desktop Navigation - Hidden on mobile/tablet */}
-          <Box sx={{ display: { xs: "none", lg: "flex" }, gap: 1, mr: 2 }}>
+          <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1, mr: 2 }}>
             {menuItems.map((item) => (
               <Button
                 key={item.path}
                 component={Link}
                 to={item.path}
                 startIcon={item.icon}
-                variant={getCurrentTab() === item.path ? "contained" : "text"}
-                sx={{ whiteSpace: "nowrap" }}
+                variant={getCurrentTab() === item.path ? 'contained' : 'text'}
+                sx={{ whiteSpace: 'nowrap' }}
               >
                 {item.text}
               </Button>
@@ -204,8 +207,8 @@ const Layout = () => {
             onClick={handleLogout}
             size="small"
             sx={{
-              display: { xs: "none", lg: "flex" },
-              minWidth: "auto",
+              display: { xs: 'none', lg: 'flex' },
+              minWidth: 'auto',
               gap: 1,
             }}
           >
@@ -224,8 +227,8 @@ const Layout = () => {
           keepMounted: true, // Better open performance on mobile.
         }}
         sx={{
-          display: { xs: "block", lg: "none" },
-          "& .MuiDrawer-paper": { boxSizing: "border-box", width: 280 },
+          display: { xs: 'block', lg: 'none' },
+          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
         }}
       >
         {drawer}
@@ -237,8 +240,8 @@ const Layout = () => {
         sx={{
           flexGrow: 1,
           py: { xs: 2, sm: 4 },
-          display: "flex",
-          flexDirection: "column",
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <Outlet />
@@ -249,10 +252,10 @@ const Layout = () => {
         sx={{
           py: 2,
           px: 2,
-          mt: "auto",
-          bgcolor: "background.paper",
+          mt: 'auto',
+          bgcolor: 'background.paper',
           borderTop: 1,
-          borderColor: "divider",
+          borderColor: 'divider',
         }}
       >
         <Container maxWidth="xl">

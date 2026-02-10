@@ -43,7 +43,7 @@ export const createBill = asyncHandler(async (req, res) => {
       }
 
       const { rows } = await client.query(
-        "SELECT selling_price, stock_qty, name FROM products WHERE id = $1 FOR UPDATE",
+        "SELECT selling_price, name FROM products WHERE id = $1;",
         [item.product_id],
       );
 
@@ -52,8 +52,16 @@ export const createBill = asyncHandler(async (req, res) => {
       const product = rows[0];
       productMap.set(item.product_id, product);
 
-      if (product.stock_qty < item.quantity)
-        throw createHttpError(409, "Not enough stock");
+      // Check total available quantity across all batches
+      const { rows: totalQtyRows } = await client.query(
+        "SELECT SUM(quantity) as total_qty FROM product_batches WHERE product_id = $1",
+        [item.product_id],
+      );
+
+      const totalQty = parseInt(totalQtyRows[0].total_qty || 0);
+
+      if (totalQty < item.quantity)
+        throw createHttpError(409, `Not enough stock for ${product.name}`);
 
       totalAmount += product.selling_price * item.quantity;
     }
@@ -118,29 +126,53 @@ export const createBill = asyncHandler(async (req, res) => {
     for (const item of normalizedItems) {
       const product = productMap.get(item.product_id);
       const price = Number(product.selling_price);
-      const lineTotal = price * item.quantity;
+      let remainingToDeduct = item.quantity;
 
-      await client.query(
-        "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name) VALUES ($1, $2, $3, $4, $5, $6)",
-        [
-          billId,
-          item.product_id,
-          item.quantity,
-          price,
-          lineTotal,
-          product.name,
-        ],
+      // Fetch batches ordered by FEFO
+      const { rows: batches } = await client.query(
+        "SELECT id, quantity, cost_price FROM product_batches WHERE product_id = $1 AND quantity > 0 ORDER BY expiry_date ASC NULLS LAST, created_at ASC FOR UPDATE",
+        [item.product_id],
       );
 
-      await client.query(
-        "UPDATE products SET stock_qty = stock_qty - $1 where id = $2",
-        [item.quantity, item.product_id],
-      );
+      for (const batch of batches) {
+        if (remainingToDeduct <= 0) break;
 
-      await client.query(
-        "INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by) VALUES ($1, $2, 'OUT', $3, $4)",
-        [item.product_id, item.quantity, billNumber, user_id],
-      );
+        const deductionFromBatch = Math.min(batch.quantity, remainingToDeduct);
+        const lineTotal = price * deductionFromBatch;
+
+        await client.query(
+          "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+          [
+            billId,
+            item.product_id,
+            deductionFromBatch,
+            price,
+            lineTotal,
+            product.name,
+            batch.id,
+            batch.cost_price,
+          ],
+        );
+
+        await client.query(
+          "UPDATE product_batches SET quantity = quantity - $1 WHERE id = $2",
+          [deductionFromBatch, batch.id],
+        );
+
+        await client.query(
+          "INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by, batch_id) VALUES ($1, $2, 'SALE', $3, $4, $5)",
+          [item.product_id, deductionFromBatch, billNumber, user_id, batch.id],
+        );
+
+        remainingToDeduct -= deductionFromBatch;
+      }
+
+      if (remainingToDeduct > 0) {
+        throw createHttpError(
+          409,
+          `Stock inconsistency detected for ${product.name}`,
+        );
+      }
     }
 
     return { isNew: true, bill: billRes.rows[0] };
@@ -166,7 +198,6 @@ export const createBill = asyncHandler(async (req, res) => {
 export const getBillById = asyncHandler(async (req, res) => {
   const { bill_id } = req.params;
   const { limit = 10, page = 1 } = req.query;
-  console.log(bill_id);
 
   const { rows } = await pool.query(
     `SELECT
@@ -285,19 +316,26 @@ export const voidBill = asyncHandler(async (req, res) => {
     const reference = `VOID-BILL-${bill.bill_number}`;
 
     const billItems = await client.query(
-      "SELECT product_id, quantity FROM bill_items WHERE bill_id = $1 FOR UPDATE",
+      "SELECT product_id, quantity, batch_id FROM bill_items WHERE bill_id = $1 FOR UPDATE",
       [bill_id],
     );
 
     for (const item of billItems.rows) {
-      await client.query(
-        "UPDATE products SET stock_qty = stock_qty + $1 WHERE id = $2",
-        [item.quantity, item.product_id],
-      );
+      if (item.batch_id) {
+        await client.query(
+          "UPDATE product_batches SET quantity = quantity + $1 WHERE id = $2",
+          [item.quantity, item.batch_id],
+        );
+      } else {
+        await client.query(
+          "UPDATE product_batches SET quantity = quantity + $1 WHERE product_id = $2 AND batch_no = 'INITIAL'",
+          [item.quantity, item.product_id],
+        );
+      }
 
       await client.query(
-        "INSERT INTO stock_movements(product_id, quantity, movement_type, reference, created_by) VALUES ($1, $2, 'IN', $3, $4)",
-        [item.product_id, item.quantity, reference, user_id],
+        "INSERT INTO stock_movements(product_id, quantity, movement_type, reference, created_by, batch_id) VALUES ($1, $2, 'IN', $3, $4, $5)",
+        [item.product_id, item.quantity, reference, user_id, item.batch_id],
       );
     }
 
@@ -305,8 +343,6 @@ export const voidBill = asyncHandler(async (req, res) => {
       "UPDATE bills SET is_void = TRUE, voided_at = NOW(), void_by = $1 WHERE id = $2",
       [user_id, bill_id],
     );
-
-    console.log(bill_id);
 
     await logBillEvent({
       client,
@@ -353,31 +389,43 @@ export const createReturn = asyncHandler(async (req, res) => {
       throw createHttpError(409, "Cannot return items from void bill");
 
     const billItemsRes = await client.query(
-      "SELECT product_id, quantity, price FROM bill_items WHERE bill_id = $1",
+      "SELECT id, product_id, quantity, price, batch_id FROM bill_items WHERE bill_id = $1",
       [bill_id],
     );
 
-    const billItemMap = new Map();
+    // Group bill items by product_id
+    const billItemGroups = new Map();
     billItemsRes.rows.forEach((item) => {
-      billItemMap.set(item.product_id, item);
+      if (!billItemGroups.has(item.product_id)) {
+        billItemGroups.set(item.product_id, []);
+      }
+      billItemGroups.get(item.product_id).push(item);
     });
 
     const returnedQtyMap = await getReturnedQtyMap(client, bill_id);
+    // returnedQtyMap currently returns Map<product_id, total_returned_qty>
+    // We might need Map<bill_item_id, returned_qty> for precision,
+    // but let's check getReturnedQtyMap implementation.
 
     let totalReturnAmount = 0;
 
     for (const item of items) {
-      const billItem = billItemMap.get(item.product_id);
+      const billItems = billItemGroups.get(item.product_id);
 
-      if (!billItem) throw createHttpError(400, "Product not part of bill");
+      if (!billItems?.length)
+        throw createHttpError(
+          400,
+          `Product ${item.product_id} not part of bill`,
+        );
 
+      const totalSold = billItems.reduce((sum, bi) => sum + bi.quantity, 0);
       const alreadyReturned = returnedQtyMap.get(item.product_id) || 0;
-      const remainingQty = billItem.quantity - alreadyReturned;
+      const remainingQty = totalSold - alreadyReturned;
 
       if (item.quantity <= 0 || item.quantity > remainingQty)
         throw createHttpError(409, "Invalid return quantity");
 
-      totalReturnAmount += billItem.price * item.quantity;
+      totalReturnAmount += billItems[0].price * item.quantity;
     }
 
     const { refund_required } = req.body;
@@ -406,8 +454,9 @@ export const createReturn = asyncHandler(async (req, res) => {
 
     /** Insert return items + restore stock */
     for (const item of items) {
-      const billItem = billItemMap.get(item.product_id);
-      const lineTotal = billItem.price * item.quantity;
+      const billItems = billItemGroups.get(item.product_id);
+      const price = billItems[0].price;
+      const lineTotal = price * item.quantity;
 
       await client.query(
         `
@@ -415,22 +464,58 @@ export const createReturn = asyncHandler(async (req, res) => {
         (return_id, product_id, quantity, price, line_total)
         VALUES ($1, $2, $3, $4, $5)
         `,
-        [returnId, item.product_id, item.quantity, billItem.price, lineTotal],
+        [returnId, item.product_id, item.quantity, price, lineTotal],
       );
 
-      await client.query(
-        "UPDATE products SET stock_qty = stock_qty + $1 WHERE id = $2",
-        [item.quantity, item.product_id],
-      );
+      let qtyToRestore = item.quantity;
 
-      await client.query(
-        `
-        INSERT INTO stock_movements
-        (product_id, quantity, movement_type, reference, created_by)
-        VALUES ($1, $2, 'IN', $3, $4)
-        `,
-        [item.product_id, item.quantity, reference, user_id],
-      );
+      // We need to figure out which batches to restore to.
+      // We'll use LIFO for returns (restore to later batches first)
+      // or just any available returnable quantity in bill_items.
+
+      // First, find how much was already returned for this product to skip those units
+      let skipQty = returnedQtyMap.get(item.product_id) || 0;
+
+      // Sort billItems by id DESC to do LIFO-like restoration
+      const sortedBillItems = [...billItems].sort((a, b) => b.id - a.id);
+
+      for (const bi of sortedBillItems) {
+        if (qtyToRestore <= 0) break;
+
+        const biReturnable = bi.quantity;
+
+        // Calculate how much of this specific bill_item is already "returned" (conceptually)
+        const biAlreadyReturned = Math.min(biReturnable, skipQty);
+        skipQty -= biAlreadyReturned;
+
+        const biAvailableToReturn = biReturnable - biAlreadyReturned;
+        if (biAvailableToReturn <= 0) continue;
+
+        const restoreToThisBI = Math.min(biAvailableToReturn, qtyToRestore);
+
+        if (bi.batch_id) {
+          await client.query(
+            "UPDATE product_batches SET quantity = quantity + $1 WHERE id = $2",
+            [restoreToThisBI, bi.batch_id],
+          );
+        } else {
+          await client.query(
+            "UPDATE product_batches SET quantity = quantity + $1 WHERE product_id = $2 AND batch_no = 'INITIAL'",
+            [restoreToThisBI, item.product_id],
+          );
+        }
+
+        await client.query(
+          `
+          INSERT INTO stock_movements
+          (product_id, quantity, movement_type, reference, created_by, batch_id)
+          VALUES ($1, $2, 'IN', $3, $4, $5)
+          `,
+          [item.product_id, restoreToThisBI, reference, user_id, bi.batch_id],
+        );
+
+        qtyToRestore -= restoreToThisBI;
+      }
     }
 
     /** Update bill returned_amount */
@@ -786,7 +871,7 @@ export const getBillDetailsForAdmin = asyncHandler(async (req, res) => {
     const returns = [];
     for (const ret of returnsRes.rows) {
       const retItemsRes = await client.query(
-        `SELECT ri.*, bi.product_name
+        `SELECT DISTINCT ON (ri.id) ri.*, bi.product_name
          FROM return_items ri
          JOIN bill_items bi ON ri.product_id = bi.product_id AND bi.bill_id = $1
          WHERE ri.return_id = $2`,
