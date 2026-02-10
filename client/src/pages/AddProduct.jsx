@@ -80,6 +80,48 @@ const AddProduct = () => {
     }
   };
 
+  // Handle global barcode scanning
+  React.useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = 0;
+
+    const handleGlobalKeyDown = (e) => {
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+
+      // If focus is already on barcode input, let it handle the input naturally
+      if (document.activeElement?.name === 'barcode') return;
+
+      if (e.key === 'Enter') {
+        // If buffer looks like a barcode (length > 2 and fast input)
+        // 100ms threshold effectively filters out manual typing of 'Enter' unless they are super fast
+        if (buffer.length >= 3 && timeDiff <= 100) {
+          e.preventDefault();
+          setFormData((prev) => ({
+            ...prev,
+            barcode: buffer,
+          }));
+        }
+        buffer = '';
+        return;
+      }
+
+      // Reset buffer if typing is too slow (manual entry)
+      if (timeDiff > 100) {
+        buffer = '';
+      }
+
+      // Only add printable characters
+      if (e.key.length === 1) {
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto' }}>
       <Box
