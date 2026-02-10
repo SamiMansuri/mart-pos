@@ -62,13 +62,23 @@ const AddProduct = () => {
 
       setStatus({
         type: 'success',
-        message: 'Product added successfully! Redirecting...',
+        message: 'Product added successfully!',
       });
 
-      // Redirect after a brief delay
-      setTimeout(() => {
-        navigate('/admin/products');
-      }, 1500);
+      // Reset form data and focus back to product name
+      setFormData({
+        product_name: '',
+        barcode: '',
+        selling_price: '',
+        batch_no: '',
+        quantity: '',
+        cost_price: '',
+        expiry_date: '',
+      });
+
+      // Focus on product name field (optional but helpful)
+      const productNameField = document.querySelector('[name="product_name"]');
+      if (productNameField) productNameField.focus();
     } catch (err) {
       console.error('Failed to add product:', err);
       setStatus({
