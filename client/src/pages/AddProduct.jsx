@@ -80,10 +80,15 @@ const AddProduct = () => {
       const productNameField = document.querySelector('[name="product_name"]');
       if (productNameField) productNameField.focus();
     } catch (err) {
-      console.error('Failed to add product:', err);
+      // Better error message extraction from API response
+      const errorMessage =
+        typeof err === 'string'
+          ? err
+          : err.error.message || 'Failed to add product. Please try again.';
+
       setStatus({
         type: 'error',
-        message: err.message || 'Failed to add product. Please try again.',
+        message: errorMessage,
       });
     } finally {
       setLoading(false);
