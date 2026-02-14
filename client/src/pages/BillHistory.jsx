@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { billsApi } from "../api/api";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { billsApi } from '../api/api';
 import {
   Box,
   Typography,
@@ -14,9 +15,11 @@ import {
   CircularProgress,
   Pagination,
   Alert,
-} from "@mui/material";
+  Button,
+} from '@mui/material';
 
 const BillHistory = () => {
+  const navigate = useNavigate();
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,7 +39,7 @@ const BillHistory = () => {
       setBills(response.bills || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (err) {
-      setError(err.message || "Failed to fetch bill history");
+      setError(err.message || 'Failed to fetch bill history');
       setBills([]);
     } finally {
       setLoading(false);
@@ -49,13 +52,11 @@ const BillHistory = () => {
 
   const formatDateTime = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleString("en-US", {
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    }).format(date);
   };
 
   const formatCurrency = (amount) => {
@@ -64,20 +65,20 @@ const BillHistory = () => {
 
   const getPaymentStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case "completed":
-        return "success";
-      case "pending":
-        return "warning";
-      case "failed":
-        return "error";
+      case 'completed':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'failed':
+        return 'error';
       default:
-        return "default";
+        return 'default';
     }
   };
 
   if (loading && bills.length === 0) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
         <CircularProgress />
       </Box>
     );
@@ -90,7 +91,7 @@ const BillHistory = () => {
           variant="h4"
           fontWeight={700}
           gutterBottom
-          sx={{ fontSize: { xs: "1.75rem", sm: "2.125rem" } }}
+          sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem' } }}
         >
           Bill History
         </Typography>
@@ -106,7 +107,7 @@ const BillHistory = () => {
       )}
 
       {bills.length === 0 ? (
-        <Paper sx={{ p: 6, textAlign: "center" }}>
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
             No bills found
           </Typography>
@@ -116,7 +117,7 @@ const BillHistory = () => {
         </Paper>
       ) : (
         <>
-          <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
             <Table sx={{ minWidth: 650 }}>
               <TableHead>
                 <TableRow>
@@ -145,6 +146,11 @@ const BillHistory = () => {
                       Time
                     </Typography>
                   </TableCell>
+                  <TableCell>
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      Actions
+                    </Typography>
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -166,7 +172,7 @@ const BillHistory = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={bill.payment_status || "CASH"}
+                        label={bill.payment_status || 'CASH'}
                         color={getPaymentStatusColor(bill.payment_status)}
                         size="small"
                       />
@@ -183,6 +189,15 @@ const BillHistory = () => {
                         {formatDateTime(bill.created_at)}
                       </Typography>
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => navigate(`/bill-view/${bill.id}`)}
+                      >
+                        View
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -190,7 +205,7 @@ const BillHistory = () => {
           </TableContainer>
 
           {totalPages > 1 && (
-            <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
               <Pagination
                 count={totalPages}
                 page={page}

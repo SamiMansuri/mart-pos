@@ -13,6 +13,7 @@ import UpdateProduct from './pages/UpdateProduct';
 import CreateEmployee from './pages/CreateEmployee';
 import EmployeeList from './pages/EmployeeList';
 import ReturnBill from './pages/ReturnBill';
+import BillView from './pages/BillView';
 import AdminBillDetails from './pages/AdminBillDetails';
 import Reports from './pages/Reports';
 import StockEntry from './pages/StockEntry';
@@ -110,6 +111,14 @@ function App() {
             element={
               <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <BillHistory />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="bill-view/:id"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <BillView />
               </RoleGuard>
             }
           />

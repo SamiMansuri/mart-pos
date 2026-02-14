@@ -217,8 +217,8 @@ export const getBillById = asyncHandler(async (req, res) => {
      FROM bills b
      JOIN bill_items bi ON bi.bill_id = b.id
      JOIN products p ON p.id = bi.product_id
-     WHERE b.id = $1 ORDER BY bi.id DESC LIMIT $2 OFFSET $3`,
-    [bill_id, limit, (page - 1) * limit],
+     WHERE b.id = $1 ORDER BY bi.id ASC`,
+    [bill_id],
   );
   if (!rows.length) throw new Error("Bill not found");
 
