@@ -11,6 +11,10 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { productsApi } from '../api/api';
@@ -23,6 +27,8 @@ const AddProduct = () => {
     product_name: '',
     barcode: '',
     selling_price: '',
+    pricing_type: 'fixed',
+    unit: '',
     batch_no: '',
     quantity: '',
     cost_price: '',
@@ -49,6 +55,15 @@ const AddProduct = () => {
       return;
     }
 
+    // Validate unit for per-weight items
+    if (formData.pricing_type === 'per_weight' && !formData.unit) {
+      setStatus({
+        type: 'error',
+        message: 'Unit is required for per-weight items',
+      });
+      return;
+    }
+
     setLoading(true);
     setStatus({ type: '', message: '' });
 
@@ -56,8 +71,9 @@ const AddProduct = () => {
       await productsApi.create({
         ...formData,
         selling_price: parseFloat(formData.selling_price),
-        quantity: formData.quantity ? parseInt(formData.quantity, 10) : 0,
+        quantity: formData.quantity ? parseFloat(formData.quantity) : 0,
         cost_price: formData.cost_price ? parseFloat(formData.cost_price) : 0,
+        unit: formData.pricing_type === 'per_weight' ? formData.unit : null,
       });
 
       setStatus({
@@ -70,6 +86,8 @@ const AddProduct = () => {
         product_name: '',
         barcode: '',
         selling_price: '',
+        pricing_type: 'fixed',
+        unit: '',
         batch_no: '',
         quantity: '',
         cost_price: '',
@@ -113,6 +131,9 @@ const AddProduct = () => {
         // 100ms threshold effectively filters out manual typing of 'Enter' unless they are super fast
         if (buffer.length >= 3 && timeDiff <= 100) {
           e.preventDefault();
+          if (document.activeElement?.tagName === 'INPUT') {
+            document.activeElement.blur();
+          }
           setFormData((prev) => ({
             ...prev,
             barcode: buffer,
@@ -129,6 +150,11 @@ const AddProduct = () => {
 
       // Only add printable characters
       if (e.key.length === 1) {
+        // If focus is on a text field, block input if it's fast enough to be a scanner
+        const isInput = document.activeElement?.tagName === 'INPUT';
+        if (isInput && timeDiff <= 50) {
+          e.preventDefault();
+        }
         buffer += e.key;
       }
     };
@@ -206,6 +232,42 @@ const AddProduct = () => {
                   ),
                 }}
                 inputProps={{ step: '0.01', min: '0' }}
+              />
+            </Grid>
+
+            {/* Pricing Type and Unit */}
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Pricing Type</InputLabel>
+                <Select
+                  name="pricing_type"
+                  value={formData.pricing_type}
+                  onChange={handleChange}
+                  label="Pricing Type"
+                >
+                  <MenuItem value="fixed">Fixed Price (Barcode)</MenuItem>
+                  <MenuItem value="per_unit">Per Unit (Loose Count)</MenuItem>
+                  <MenuItem value="per_weight">Per Weight (kg/g)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Unit"
+                name="unit"
+                value={formData.unit}
+                onChange={handleChange}
+                placeholder="e.g., kg, g, pcs"
+                required={formData.pricing_type === 'per_weight'}
+                disabled={formData.pricing_type === 'fixed'}
+                helperText={
+                  formData.pricing_type === 'per_weight'
+                    ? 'Required for per-weight items'
+                    : formData.pricing_type === 'per_unit'
+                      ? 'Optional for per-unit items'
+                      : 'Not applicable for fixed-price items'
+                }
               />
             </Grid>
 

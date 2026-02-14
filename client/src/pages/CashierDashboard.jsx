@@ -58,8 +58,7 @@ const CashierDashboard = () => {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
 
   // Barcode Scanning State
-  const [barcodeValue, setBarcodeValue] = useState('');
-  const barcodeInputRef = useRef(null);
+  // Migrated to global listener for better reliability
 
   // Audio effects
   const playBeep = useCallback(() => {
@@ -137,46 +136,57 @@ const CashierDashboard = () => {
         setTimeout(() => setStatus({ type: '', message: '' }), 3000);
       } finally {
         setBarcodeValue('');
+        setSearchTerm(''); // Clear search term to remove any leaked characters
       }
     },
     [playBeep, playErrorSound, addToCart],
   );
 
-  // Ensure barcode input is always focused when not interacting with other inputs
+  // Handle global barcode scanning
   useEffect(() => {
-    const handleAutoFocus = () => {
-      const active = document.activeElement;
+    let buffer = '';
+    let lastKeyTime = 0;
+
+    const handleGlobalKeyDown = (e) => {
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+
+      // If focus is on a text field, block input if it's fast enough to be a scanner
       const isInput =
-        active &&
-        (active.tagName === 'INPUT' ||
-          active.tagName === 'TEXTAREA' ||
-          active.isContentEditable);
+        document.activeElement &&
+        (document.activeElement.tagName === 'INPUT' ||
+          document.activeElement.tagName === 'TEXTAREA');
 
-      if (!isInput && barcodeInputRef.current) {
-        barcodeInputRef.current.focus();
-      }
-    };
-
-    const focusInterval = setInterval(handleAutoFocus, 500);
-
-    const handleWindowClick = (e) => {
-      // If clicking on an input field or something that should handle its own focus, skip
-      if (
-        e.target.tagName === 'INPUT' ||
-        e.target.tagName === 'TEXTAREA' ||
-        e.target.closest('button')
-      ) {
+      if (e.key === 'Enter') {
+        // Barcode scanners usually trigger Enter. If buffer has content and was fast...
+        if (buffer.length >= 3 && timeDiff <= 100) {
+          e.preventDefault();
+          if (isInput) document.activeElement.blur(); // Remove focus on scan
+          handleBarcodeSubmit(buffer);
+        }
+        buffer = '';
         return;
       }
-      handleAutoFocus();
+
+      // Reset buffer if typing is too slow (manual entry)
+      if (timeDiff > 100) {
+        buffer = '';
+      }
+
+      // Only add printable characters to buffer
+      if (e.key.length === 1) {
+        // If it's very fast, prevent default to avoid writing to focused input
+        if (isInput && timeDiff <= 50) {
+          e.preventDefault();
+        }
+        buffer += e.key;
+      }
     };
 
-    window.addEventListener('click', handleWindowClick);
-    return () => {
-      clearInterval(focusInterval);
-      window.removeEventListener('click', handleWindowClick);
-    };
-  }, []);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [handleBarcodeSubmit]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -241,6 +251,45 @@ const CashierDashboard = () => {
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  const printBill = async (
+    cartItems,
+    totalAmount,
+    billNumber,
+    paymentMethod,
+    date,
+  ) => {
+    try {
+      const billData = {
+        bill: {
+          bill_number: billNumber,
+          date: date,
+          payment_method: paymentMethod,
+          items: cartItems.map((item) => ({
+            name: item.name,
+            barcode: item.barcode,
+            qty: item.quantity,
+            price: parseFloat(item.selling_price).toFixed(2),
+            total: (item.selling_price * item.quantity).toFixed(2),
+          })),
+          total: totalAmount.toFixed(2),
+        },
+      };
+
+      await fetch('http://localhost:3005/print', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(billData),
+      });
+      console.log('Print request sent successfully');
+    } catch (err) {
+      console.error('Failed to print bill:', err);
+      // We don't set status error here as the bill was created successfully
+      // and print failure is secondary to transaction completion
+    }
+  };
+
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setProcessing(true);
@@ -251,16 +300,34 @@ const CashierDashboard = () => {
         product_id: item.id,
         quantity: item.quantity,
       }));
-      await billsApi.create({
+      const currentCart = [...cart];
+      const currentTotal = total;
+
+      const response = await billsApi.create({
         items,
         payment_method: paymentMethod,
         idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         business_date: new Date().toISOString().split('T')[0],
       });
+
       setStatus({
         type: 'success',
         message: 'Transaction completed successfully',
       });
+
+      // Trigger print after successful bill creation
+      printBill(
+        currentCart,
+        currentTotal,
+        response.bill_number,
+        paymentMethod,
+        new Intl.DateTimeFormat('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          dateStyle: 'medium',
+          timeStyle: 'medium',
+        }).format(new Date()),
+      );
+
       setCart([]);
       setPaymentMethod('CASH'); // Reset payment method after checkout
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
@@ -440,19 +507,7 @@ const CashierDashboard = () => {
             />
           </Paper>
 
-          {/* Hidden Barcode Input for background scanning */}
-          <input
-            ref={barcodeInputRef}
-            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
-            value={barcodeValue}
-            onChange={(e) => setBarcodeValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleBarcodeSubmit(barcodeValue);
-              }
-            }}
-            autoFocus
-          />
+          {/* Hidden Barcode Input removed: using global listener instead */}
 
           {/* Cart Table Section */}
           <TableContainer
