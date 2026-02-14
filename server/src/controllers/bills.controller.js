@@ -52,17 +52,6 @@ export const createBill = asyncHandler(async (req, res) => {
       const product = rows[0];
       productMap.set(item.product_id, product);
 
-      // Check total available quantity across all batches
-      const { rows: totalQtyRows } = await client.query(
-        "SELECT SUM(quantity) as total_qty FROM product_batches WHERE product_id = $1",
-        [item.product_id],
-      );
-
-      const totalQty = parseInt(totalQtyRows[0].total_qty || 0);
-
-      if (totalQty < item.quantity)
-        throw createHttpError(409, `Not enough stock for ${product.name}`);
-
       totalAmount += product.selling_price * item.quantity;
     }
 
@@ -167,11 +156,51 @@ export const createBill = asyncHandler(async (req, res) => {
         remainingToDeduct -= deductionFromBatch;
       }
 
+      // If there's still quantity to deduct, use the INITIAL batch (or oldest batch) and allow negative
       if (remainingToDeduct > 0) {
-        throw createHttpError(
-          409,
-          `Stock inconsistency detected for ${product.name}`,
+        // Find the INITIAL batch or the oldest batch for this product
+        const { rows: fallbackBatches } = await client.query(
+          "SELECT id, quantity, cost_price FROM product_batches WHERE product_id = $1 ORDER BY CASE WHEN batch_no = 'INITIAL' THEN 0 ELSE 1 END, created_at ASC LIMIT 1 FOR UPDATE",
+          [item.product_id],
         );
+
+        if (fallbackBatches.length > 0) {
+          const fallbackBatch = fallbackBatches[0];
+          const lineTotal = price * remainingToDeduct;
+
+          // Insert bill item for the remaining quantity
+          await client.query(
+            "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            [
+              billId,
+              item.product_id,
+              remainingToDeduct,
+              price,
+              lineTotal,
+              product.name,
+              fallbackBatch.id,
+              fallbackBatch.cost_price,
+            ],
+          );
+
+          // Deduct from the fallback batch (allowing negative)
+          await client.query(
+            "UPDATE product_batches SET quantity = quantity - $1 WHERE id = $2",
+            [remainingToDeduct, fallbackBatch.id],
+          );
+
+          // Record stock movement
+          await client.query(
+            "INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by, batch_id) VALUES ($1, $2, 'SALE', $3, $4, $5)",
+            [
+              item.product_id,
+              remainingToDeduct,
+              billNumber,
+              user_id,
+              fallbackBatch.id,
+            ],
+          );
+        }
       }
     }
 
