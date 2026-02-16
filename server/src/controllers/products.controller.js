@@ -122,9 +122,9 @@ export const createProduct = asyncHandler(async (req, res) => {
         initialBatchNo,
         initialQty,
         initialCost,
+        mrp || 0,
         expiry_date || null,
         user_id,
-        mrp || 0,
       ]);
 
       const batch = batchRes.rows[0];
