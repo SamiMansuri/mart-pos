@@ -1,6 +1,6 @@
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { billsApi, productsApi } from "../api/api";
+import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { billsApi, productsApi } from '../api/api';
 import {
   Box,
   Grid,
@@ -9,15 +9,15 @@ import {
   Typography,
   CircularProgress,
   Button,
-} from "@mui/material";
+} from '@mui/material';
 import {
   TrendingUp as RevenueIcon,
   Receipt as BillIcon,
   Inventory as InventoryIcon,
   CheckCircle as HealthIcon,
   Add as AddIcon,
-} from "@mui/icons-material";
-import BillsList from "./BillsList";
+} from '@mui/icons-material';
+import BillsList from './BillsList';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -54,42 +54,42 @@ const AdminDashboard = () => {
           0,
       });
     } catch (err) {
-      console.error("Failed to load dashboard stats", err);
+      console.error('Failed to load dashboard stats', err);
     } finally {
       setLoading(false);
     }
   };
 
   const statCards = [
+    // {
+    //   title: "Total Revenue",
+    //   value: `₹${stats.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    //   icon: RevenueIcon,
+    //   color: "primary.main",
+    // },
     {
-      title: "Total Revenue",
-      value: `₹${stats.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      icon: RevenueIcon,
-      color: "primary.main",
-    },
-    {
-      title: "Transactions",
+      title: 'Transactions',
       value: stats.billCount,
       icon: BillIcon,
-      color: "success.main",
+      color: 'success.main',
     },
     {
-      title: "Products",
+      title: 'Products',
       value: stats.productCount,
       icon: InventoryIcon,
-      color: "warning.main",
+      color: 'warning.main',
     },
     {
-      title: "System Status",
-      value: "Online",
+      title: 'System Status',
+      value: 'Online',
       icon: HealthIcon,
-      color: "info.main",
+      color: 'info.main',
     },
   ];
 
   if (loading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
         <CircularProgress />
       </Box>
     );
@@ -100,10 +100,10 @@ const AdminDashboard = () => {
       <Box
         sx={{
           mb: 4,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          flexWrap: "wrap",
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
           gap: 2,
         }}
       >
@@ -118,8 +118,8 @@ const AdminDashboard = () => {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => navigate("/admin/products/add")}
-          sx={{ whiteSpace: "nowrap" }}
+          onClick={() => navigate('/admin/products/add')}
+          sx={{ whiteSpace: 'nowrap' }}
         >
           Add Product
         </Button>
@@ -134,8 +134,8 @@ const AdminDashboard = () => {
                 <CardContent>
                   <Box
                     sx={{
-                      display: "flex",
-                      alignItems: "center",
+                      display: 'flex',
+                      alignItems: 'center',
                       gap: 2,
                       mb: 2,
                     }}
@@ -146,9 +146,9 @@ const AdminDashboard = () => {
                         height: 48,
                         borderRadius: 2,
                         bgcolor: `${stat.color}15`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
                       <Icon sx={{ color: stat.color, fontSize: 24 }} />
@@ -157,7 +157,7 @@ const AdminDashboard = () => {
                   <Typography
                     variant="caption"
                     color="text.secondary"
-                    sx={{ display: "block", mb: 0.5 }}
+                    sx={{ display: 'block', mb: 0.5 }}
                   >
                     {stat.title}
                   </Typography>
