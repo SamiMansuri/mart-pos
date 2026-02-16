@@ -27,11 +27,10 @@ const AddProduct = () => {
     product_name: '',
     barcode: '',
     selling_price: '',
-    pricing_type: 'fixed',
-    unit: '',
     batch_no: '',
     quantity: '',
     cost_price: '',
+    mrp: '',
     expiry_date: '',
   });
 
@@ -55,15 +54,6 @@ const AddProduct = () => {
       return;
     }
 
-    // Validate unit for per-weight items
-    if (formData.pricing_type === 'per_weight' && !formData.unit) {
-      setStatus({
-        type: 'error',
-        message: 'Unit is required for per-weight items',
-      });
-      return;
-    }
-
     setLoading(true);
     setStatus({ type: '', message: '' });
 
@@ -73,7 +63,7 @@ const AddProduct = () => {
         selling_price: parseFloat(formData.selling_price),
         quantity: formData.quantity ? parseFloat(formData.quantity) : 0,
         cost_price: formData.cost_price ? parseFloat(formData.cost_price) : 0,
-        unit: formData.pricing_type === 'per_weight' ? formData.unit : null,
+        mrp: formData.mrp ? parseFloat(formData.mrp) : 0,
       });
 
       setStatus({
@@ -86,11 +76,10 @@ const AddProduct = () => {
         product_name: '',
         barcode: '',
         selling_price: '',
-        pricing_type: 'fixed',
-        unit: '',
         batch_no: '',
         quantity: '',
         cost_price: '',
+        mrp: '',
         expiry_date: '',
       });
 
@@ -196,7 +185,7 @@ const AddProduct = () => {
 
         <Box component="form" onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={12}>
               <TextField
                 fullWidth
                 label="Product Name"
@@ -207,13 +196,16 @@ const AddProduct = () => {
                 placeholder="Enter product name"
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Barcode (Optional)"
                 name="barcode"
                 value={formData.barcode}
                 onChange={handleChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.preventDefault();
+                }}
                 placeholder="Scan or enter barcode"
               />
             </Grid>
@@ -234,40 +226,32 @@ const AddProduct = () => {
                 inputProps={{ step: '0.01', min: '0' }}
               />
             </Grid>
-
-            {/* Pricing Type and Unit */}
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Pricing Type</InputLabel>
-                <Select
-                  name="pricing_type"
-                  value={formData.pricing_type}
-                  onChange={handleChange}
-                  label="Pricing Type"
-                >
-                  <MenuItem value="fixed">Fixed Price (Barcode)</MenuItem>
-                  <MenuItem value="per_unit">Per Unit (Loose Count)</MenuItem>
-                  <MenuItem value="per_weight">Per Weight (kg/g)</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
-                label="Unit"
-                name="unit"
-                value={formData.unit}
+                label="M.R.P (Optional)"
+                name="mrp"
+                type="number"
+                value={formData.mrp}
                 onChange={handleChange}
-                placeholder="e.g., kg, g, pcs"
-                required={formData.pricing_type === 'per_weight'}
-                disabled={formData.pricing_type === 'fixed'}
-                helperText={
-                  formData.pricing_type === 'per_weight'
-                    ? 'Required for per-weight items'
-                    : formData.pricing_type === 'per_unit'
-                      ? 'Optional for per-unit items'
-                      : 'Not applicable for fixed-price items'
-                }
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">₹</InputAdornment>
+                  ),
+                }}
+                inputProps={{ step: '0.01', min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Quantity (Optional)"
+                name="quantity"
+                type="number"
+                value={formData.quantity}
+                onChange={handleChange}
+                placeholder="Initial stock"
+                inputProps={{ min: '0' }}
               />
             </Grid>
 
@@ -282,19 +266,7 @@ const AddProduct = () => {
                 placeholder='Defaults to "INITIAL"'
               />
             </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Quantity (Optional)"
-                name="quantity"
-                type="number"
-                value={formData.quantity}
-                onChange={handleChange}
-                placeholder="Initial stock"
-                inputProps={{ min: '0' }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
                 label="Cost Price (Optional)"
@@ -310,7 +282,7 @@ const AddProduct = () => {
                 inputProps={{ step: '0.01', min: '0' }}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
                 label="Expiry Date (Optional)"
@@ -321,38 +293,37 @@ const AddProduct = () => {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-
-            <Grid item xs={12} sx={{ mt: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  gap: 2,
-                  justifyContent: 'flex-end',
-                  flexWrap: 'wrap',
-                }}
+          </Grid>
+          <Grid item xs={12} sx={{ mt: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 2,
+                // justifyContent: 'flex-end',
+                flexWrap: 'wrap',
+              }}
+            >
+              <Button
+                variant="outlined"
+                onClick={() => navigate(-1)}
+                disabled={loading}
+                sx={{ minWidth: { xs: '100%', sm: 120 } }}
               >
-                <Button
-                  variant="outlined"
-                  onClick={() => navigate(-1)}
-                  disabled={loading}
-                  sx={{ minWidth: { xs: '100%', sm: 120 } }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  disabled={loading}
-                  sx={{ minWidth: { xs: '100%', sm: 150 } }}
-                >
-                  {loading ? (
-                    <CircularProgress size={24} color="inherit" />
-                  ) : (
-                    'Add Product'
-                  )}
-                </Button>
-              </Box>
-            </Grid>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={loading}
+                sx={{ minWidth: { xs: '100%', sm: 150 } }}
+              >
+                {loading ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  'Add Product'
+                )}
+              </Button>
+            </Box>
           </Grid>
         </Box>
       </Paper>

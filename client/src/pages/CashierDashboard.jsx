@@ -56,6 +56,10 @@ const CashierDashboard = () => {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const searchRef = useRef(null);
+  const [activeSection, setActiveSection] = useState('SEARCH'); // 'SEARCH', 'CART', 'BILL_SUMMARY'
+  const [selectedCartIndex, setSelectedCartIndex] = useState(-1);
+  const qtyRefs = useRef([]);
 
   // Barcode Scanning State
   // Migrated to global listener for better reliability
@@ -87,22 +91,26 @@ const CashierDashboard = () => {
     oscillator.stop(audioCtx.currentTime + 0.3);
   }, []);
 
+  const removeFromCart = useCallback((productId) => {
+    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+  }, []);
+
   const addToCart = useCallback((product) => {
     setCart((prevCart) => {
-      const existingItemIndex = prevCart.findIndex(
-        (item) => item.id === product.id,
-      );
-      if (existingItemIndex > -1) {
-        const newCart = [...prevCart];
-        newCart[existingItemIndex] = {
-          ...newCart[existingItemIndex],
-          quantity: newCart[existingItemIndex].quantity + 1,
-        };
-        return newCart;
+      const existingItem = prevCart.find((item) => item.id === product.id);
+      const otherItems = prevCart.filter((item) => item.id !== product.id);
+
+      if (existingItem) {
+        return [
+          { ...existingItem, quantity: existingItem.quantity + 1 },
+          ...otherItems,
+        ];
       } else {
-        return [...prevCart, { ...product, quantity: 1 }];
+        return [{ ...product, quantity: 1 }, ...otherItems];
       }
     });
+    // Always select the top (most recent) item
+    setSelectedCartIndex(0);
   }, []);
 
   const fetchProducts = useCallback(async (term) => {
@@ -137,6 +145,8 @@ const CashierDashboard = () => {
       } finally {
         setBarcodeValue('');
         setSearchTerm(''); // Clear search term to remove any leaked characters
+        setActiveSection('CART'); // Move to cart after scanning
+        setSelectedCartIndex(0);
       }
     },
     [playBeep, playErrorSound, addToCart],
@@ -190,20 +200,102 @@ const CashierDashboard = () => {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl + Backspace to clear cart
-      if (e.ctrlKey && e.key === 'Backspace') {
+      // Check if ANY input field is currently active (excluding the ones we manage manually)
+      const isInputFocused =
+        document.activeElement &&
+        (document.activeElement.tagName === 'INPUT' ||
+          document.activeElement.tagName === 'TEXTAREA' ||
+          document.activeElement.isContentEditable);
+
+      // F2 to focus Search (Always works unless typing in another field)
+      if (e.key === 'F2') {
         e.preventDefault();
-        if (cart.length > 0) {
-          setCart([]);
-          setStatus({ type: 'info', message: 'Cart cleared' });
-          setTimeout(() => setStatus({ type: '', message: '' }), 2000);
+        setActiveSection('SEARCH');
+        searchRef.current?.focus();
+        return;
+      }
+
+      if (e.key === 'F8') {
+        e.preventDefault();
+        handleCheckout();
+      }
+
+      // Esc to blur or return to search section
+      if (e.key === 'Escape') {
+        if (isInputFocused) {
+          document.activeElement.blur();
+        }
+        // setActiveSection('SEARCH');
+        return;
+      }
+
+      // Only allow section switching and cart navigation if NOT typing in an input
+      if (!isInputFocused) {
+        // Global Navigation (Left/Right Arrow)
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          setActiveSection('CART');
+          if (cart.length > 0 && selectedCartIndex === -1) {
+            setSelectedCartIndex(0);
+          }
+          return;
+        }
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          setActiveSection('BILL_SUMMARY');
+          return;
+        }
+
+        // Cart Section Logic
+        if (activeSection === 'CART' && cart.length > 0) {
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedCartIndex((prev) =>
+              prev <= 0 ? cart.length - 1 : prev - 1,
+            );
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedCartIndex((prev) =>
+              prev >= cart.length - 1 ? 0 : prev + 1,
+            );
+          } else if (e.key === 'Delete') {
+            e.preventDefault();
+            if (selectedCartIndex > -1) {
+              const itemToRemove = cart[selectedCartIndex];
+              removeFromCart(itemToRemove.id);
+            }
+          } else if (e.key.toLowerCase() === 'q') {
+            e.preventDefault();
+            if (selectedCartIndex > -1) {
+              qtyRefs.current[selectedCartIndex]?.focus();
+            }
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart]);
+  }, [activeSection, cart, selectedCartIndex, removeFromCart]);
+
+  // Sync selection index when cart changes
+  useEffect(() => {
+    if (cart.length === 0) {
+      setSelectedCartIndex(-1);
+    } else if (selectedCartIndex >= cart.length) {
+      setSelectedCartIndex(cart.length - 1);
+    }
+  }, [cart.length, selectedCartIndex]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (selectedCartIndex >= 0 && qtyRefs.current[selectedCartIndex]) {
+      qtyRefs.current[selectedCartIndex].scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [selectedCartIndex]);
 
   useEffect(() => {
     if (!searchTerm.trim()) {
@@ -239,10 +331,6 @@ const CashierDashboard = () => {
     },
     [],
   );
-
-  const removeFromCart = useCallback((productId) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
-  }, []);
 
   const total = cart.reduce(
     (sum, item) => sum + item.selling_price * item.quantity,
@@ -289,8 +377,7 @@ const CashierDashboard = () => {
       // and print failure is secondary to transaction completion
     }
   };
-
-  const handleCheckout = async () => {
+  const handleCheckout = async (shouldPrint = true) => {
     if (cart.length === 0) return;
     setProcessing(true);
     setStatus({ type: '', message: '' });
@@ -315,18 +402,20 @@ const CashierDashboard = () => {
         message: 'Transaction completed successfully',
       });
 
-      // Trigger print after successful bill creation
-      printBill(
-        currentCart,
-        currentTotal,
-        response.bill_number,
-        paymentMethod,
-        new Intl.DateTimeFormat('en-IN', {
-          timeZone: 'Asia/Kolkata',
-          dateStyle: 'medium',
-          timeStyle: 'medium',
-        }).format(new Date()),
-      );
+      // Trigger print after successful bill creation only if shouldPrint is true
+      if (shouldPrint) {
+        printBill(
+          currentCart,
+          currentTotal,
+          response.bill_number,
+          paymentMethod,
+          new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            dateStyle: 'medium',
+            timeStyle: 'medium',
+          }).format(new Date()),
+        );
+      }
 
       setCart([]);
       setPaymentMethod('CASH'); // Reset payment method after checkout
@@ -406,15 +495,18 @@ const CashierDashboard = () => {
         >
           {/* Search Section */}
           <Paper
-            elevation={0}
+            elevation={activeSection === 'SEARCH' ? 4 : 0}
             sx={{
               p: 0,
-              border: '1px solid',
-              borderColor: 'divider',
+              border: '2px solid',
+              borderColor:
+                activeSection === 'SEARCH' ? 'primary.main' : 'divider',
               borderRadius: 2,
               flexShrink: 0,
+              // transition: 'all 0.2s ease-in-out',
             }}
           >
+            {' '}
             <Autocomplete
               openOnFocus
               clearOnBlur
@@ -431,6 +523,9 @@ const CashierDashboard = () => {
                 if (newValue) {
                   addToCart(newValue);
                   setSearchTerm('');
+                  searchRef.current?.blur();
+                  setActiveSection('CART');
+                  setSelectedCartIndex(0);
                 }
               }}
               renderOption={(props, option) => {
@@ -438,6 +533,8 @@ const CashierDashboard = () => {
                 return (
                   <ListItem key={option.id} {...optionProps} divider>
                     <ListItemText
+                      primaryTypographyProps={{ component: 'div' }}
+                      secondaryTypographyProps={{ component: 'div' }}
                       primary={
                         <Box
                           sx={{
@@ -478,6 +575,7 @@ const CashierDashboard = () => {
                   fullWidth
                   placeholder="Search product by name or scan barcode"
                   variant="outlined"
+                  inputRef={searchRef}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (
@@ -512,20 +610,31 @@ const CashierDashboard = () => {
           {/* Cart Table Section */}
           <TableContainer
             component={Paper}
-            elevation={0}
+            elevation={activeSection === 'CART' ? 4 : 0}
             sx={{
               flexGrow: 1,
               minHeight: 0,
               overflow: 'auto',
               bgcolor: 'background.paper',
               borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
+              border: '2px solid',
+              borderColor:
+                activeSection === 'CART' ? 'primary.main' : 'divider',
+              // transition: 'all 0.2s ease-in-out',
             }}
           >
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      width: 50,
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    S.No
+                  </TableCell>
                   <TableCell
                     sx={{
                       fontWeight: 700,
@@ -536,16 +645,16 @@ const CashierDashboard = () => {
                     Item Name
                   </TableCell>
                   <TableCell
-                    align="right"
-                    sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
-                  >
-                    Price
-                  </TableCell>
-                  <TableCell
                     align="center"
                     sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
                   >
                     Quantity
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
+                  >
+                    Price
                   </TableCell>
                   <TableCell
                     align="right"
@@ -563,7 +672,7 @@ const CashierDashboard = () => {
                 {cart.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       align="center"
                       sx={{ py: 10, borderBottom: 'none' }}
                     >
@@ -574,8 +683,21 @@ const CashierDashboard = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  cart.map((item) => (
-                    <TableRow key={item.id} hover>
+                  cart.map((item, index) => (
+                    <TableRow
+                      key={item.id}
+                      hover
+                      selected={index === selectedCartIndex}
+                      sx={{
+                        '&.Mui-selected': {
+                          bgcolor: 'primary.action.selected',
+                          '&:hover': {
+                            bgcolor: 'primary.action.selected',
+                          },
+                        },
+                      }}
+                    >
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell sx={{ minWidth: 200 }}>
                         <Typography variant="body2" fontWeight={600}>
                           {item.name}
@@ -597,9 +719,6 @@ const CashierDashboard = () => {
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell align="right">
-                        ₹{parseFloat(item.selling_price).toFixed(2)}
-                      </TableCell>
                       <TableCell align="center">
                         <Box
                           sx={{
@@ -618,11 +737,16 @@ const CashierDashboard = () => {
                           </IconButton>
                           <TextField
                             size="small"
+                            inputRef={(el) => (qtyRefs.current[index] = el)}
                             value={item.quantity}
                             onChange={(e) =>
                               updateQuantity(item.id, e.target.value, true)
                             }
-                            onFocus={(e) => e.target.select()}
+                            onFocus={(e) => {
+                              e.target.select();
+                              setActiveSection('CART');
+                              setSelectedCartIndex(index);
+                            }}
                             onBlur={(e) => {
                               if (
                                 e.target.value === '' ||
@@ -666,6 +790,9 @@ const CashierDashboard = () => {
                           </IconButton>
                         </Box>
                       </TableCell>
+                      <TableCell align="right">
+                        ₹{parseFloat(item.selling_price).toFixed(2)}
+                      </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>
                         ₹{(item.selling_price * item.quantity).toFixed(2)}
                       </TableCell>
@@ -697,15 +824,17 @@ const CashierDashboard = () => {
           }}
         >
           <Paper
-            elevation={1}
+            elevation={activeSection === 'BILL_SUMMARY' ? 4 : 1}
             sx={{
               p: 3,
               borderRadius: 3,
               display: 'flex',
               flexDirection: 'column',
               height: '100%',
-              border: '1px solid',
-              borderColor: 'divider',
+              border: '2px solid',
+              borderColor:
+                activeSection === 'BILL_SUMMARY' ? 'primary.main' : 'divider',
+              // transition: 'all 0.2s ease-in-out',
             }}
           >
             <Typography variant="h6" fontWeight={800} gutterBottom>
@@ -812,13 +941,38 @@ const CashierDashboard = () => {
               </ToggleButtonGroup>
             </Box>
 
-            <Box sx={{ mt: 'auto', pt: 3 }}>
+            <Box
+              sx={{
+                mt: 'auto',
+                pt: 3,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}
+            >
+              <Button
+                fullWidth
+                variant="outlined"
+                size="large"
+                disabled={processing || cart.length === 0}
+                onClick={() => handleCheckout(false)}
+                sx={{
+                  py: 1,
+                  borderRadius: 2,
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                }}
+              >
+                Checkout
+              </Button>
+
               <Button
                 fullWidth
                 variant="contained"
                 size="large"
                 disabled={processing || cart.length === 0}
-                onClick={handleCheckout}
+                onClick={() => handleCheckout(true)}
                 sx={{
                   py: 1.5,
                   borderRadius: 2,
@@ -830,7 +984,7 @@ const CashierDashboard = () => {
                 {processing ? (
                   <CircularProgress size={28} color="inherit" />
                 ) : (
-                  `Checkout ₹${total.toFixed(2)}`
+                  `Checkout & Print ₹${total.toFixed(2)}`
                 )}
               </Button>
             </Box>

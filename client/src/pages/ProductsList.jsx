@@ -214,6 +214,11 @@ const ProductsList = () => {
                   )}
                   <TableCell align="right">
                     <Typography variant="subtitle2" fontWeight={700}>
+                      M.R.P
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="subtitle2" fontWeight={700}>
                       Selling Price
                     </Typography>
                   </TableCell>
@@ -256,6 +261,11 @@ const ProductsList = () => {
                         </Typography>
                       </TableCell>
                     )}
+                    <TableCell align="right">
+                      <Typography variant="body2">
+                        {product.mrp ? formatCurrency(product.mrp) : '-'}
+                      </Typography>
+                    </TableCell>
                     <TableCell align="right">
                       <Typography
                         variant="body2"

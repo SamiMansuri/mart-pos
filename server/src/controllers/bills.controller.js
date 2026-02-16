@@ -10,6 +10,7 @@ import {
   hasRefunds,
   logBillEvent,
 } from "../services/bill.service.js";
+import { BILL_QUERIES, BATCH_QUERIES, STOCK_QUERIES } from "../db/queries.js";
 
 export const createBill = asyncHandler(async (req, res) => {
   const { items, payment_method, idempotency_key, business_date } = req.body;
@@ -24,10 +25,9 @@ export const createBill = asyncHandler(async (req, res) => {
   const normalizedItems = normalizeItems(items);
 
   const result = await withTransaction(async (client) => {
-    const existingBill = await client.query(
-      "SELECT id, bill_number, total_amount FROM bills WHERE idempotency_key = $1",
-      [idempotency_key],
-    );
+    const existingBill = await client.query(BILL_QUERIES.CHECK_IDEMPOTENCY, [
+      idempotency_key,
+    ]);
 
     if (existingBill.rows.length) {
       return { isNew: false, bill: existingBill.rows[0] };
@@ -56,52 +56,34 @@ export const createBill = asyncHandler(async (req, res) => {
     }
 
     const counterRes = await client.query(
-      `
-      SELECT last_number
-      FROM invoice_counters
-      WHERE business_date = $1
-      FOR UPDATE
-      `,
+      BILL_QUERIES.GET_NEXT_INVOICE_NUMBER,
       [business_date],
     );
 
     let nextNumber = 1;
 
     if (counterRes.rowCount === 0) {
-      await client.query(
-        `
-        INSERT INTO invoice_counters (business_date, last_number)
-        VALUES ($1, 1)
-        `,
-        [business_date],
-      );
+      await client.query(BILL_QUERIES.INSERT_INVOICE_COUNTER, [business_date]);
     } else {
       nextNumber = counterRes.rows[0].last_number + 1;
 
-      await client.query(
-        `
-        UPDATE invoice_counters
-        SET last_number = $1
-        WHERE business_date = $2
-        `,
-        [nextNumber, business_date],
-      );
+      await client.query(BILL_QUERIES.UPDATE_INVOICE_COUNTER, [
+        nextNumber,
+        business_date,
+      ]);
     }
 
     const billNumber = `BILL-${Date.now()}`;
 
-    const billRes = await client.query(
-      "INSERT INTO bills (bill_number, total_amount, payment_method, idempotency_key, created_by, payment_status, invoice_number, business_date) VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7) RETURNING *",
-      [
-        billNumber,
-        totalAmount,
-        payment_method,
-        idempotency_key,
-        user_id,
-        nextNumber,
-        business_date,
-      ],
-    );
+    const billRes = await client.query(BILL_QUERIES.CREATE, [
+      billNumber,
+      totalAmount,
+      payment_method,
+      idempotency_key,
+      user_id,
+      nextNumber,
+      business_date,
+    ]);
 
     await logBillEvent({
       client,
@@ -119,7 +101,7 @@ export const createBill = asyncHandler(async (req, res) => {
 
       // Fetch batches ordered by FEFO
       const { rows: batches } = await client.query(
-        "SELECT id, quantity, cost_price FROM product_batches WHERE product_id = $1 AND quantity > 0 ORDER BY expiry_date ASC NULLS LAST, created_at ASC FOR UPDATE",
+        BATCH_QUERIES.GET_FOR_DEDUCTION,
         [item.product_id],
       );
 
@@ -129,38 +111,39 @@ export const createBill = asyncHandler(async (req, res) => {
         const deductionFromBatch = Math.min(batch.quantity, remainingToDeduct);
         const lineTotal = price * deductionFromBatch;
 
-        await client.query(
-          "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-          [
-            billId,
-            item.product_id,
-            deductionFromBatch,
-            price,
-            lineTotal,
-            product.name,
-            batch.id,
-            batch.cost_price,
-          ],
-        );
+        await client.query(BILL_QUERIES.CREATE_ITEM, [
+          billId,
+          item.product_id,
+          deductionFromBatch,
+          price,
+          lineTotal,
+          product.name,
+          batch.id,
+          batch.cost_price,
+          batch.mrp,
+        ]);
 
-        await client.query(
-          "UPDATE product_batches SET quantity = quantity - $1 WHERE id = $2",
-          [deductionFromBatch, batch.id],
-        );
+        await client.query(BATCH_QUERIES.UPDATE_QTY, [
+          deductionFromBatch,
+          batch.id,
+        ]);
 
-        await client.query(
-          "INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by, batch_id) VALUES ($1, $2, 'SALE', $3, $4, $5)",
-          [item.product_id, deductionFromBatch, billNumber, user_id, batch.id],
-        );
+        await client.query(STOCK_QUERIES.RECORD_MOVEMENT, [
+          item.product_id,
+          deductionFromBatch,
+          "SALE",
+          billNumber,
+          user_id,
+          batch.id,
+        ]);
 
         remainingToDeduct -= deductionFromBatch;
       }
 
       // If there's still quantity to deduct, use the INITIAL batch (or oldest batch) and allow negative
       if (remainingToDeduct > 0) {
-        // Find the INITIAL batch or the oldest batch for this product
         const { rows: fallbackBatches } = await client.query(
-          "SELECT id, quantity, cost_price FROM product_batches WHERE product_id = $1 ORDER BY CASE WHEN batch_no = 'INITIAL' THEN 0 ELSE 1 END, created_at ASC LIMIT 1 FOR UPDATE",
+          BATCH_QUERIES.GET_FALLBACK,
           [item.product_id],
         );
 
@@ -169,37 +152,33 @@ export const createBill = asyncHandler(async (req, res) => {
           const lineTotal = price * remainingToDeduct;
 
           // Insert bill item for the remaining quantity
-          await client.query(
-            "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-            [
-              billId,
-              item.product_id,
-              remainingToDeduct,
-              price,
-              lineTotal,
-              product.name,
-              fallbackBatch.id,
-              fallbackBatch.cost_price,
-            ],
-          );
+          await client.query(BILL_QUERIES.CREATE_ITEM, [
+            billId,
+            item.product_id,
+            remainingToDeduct,
+            price,
+            lineTotal,
+            product.name,
+            fallbackBatch.id,
+            fallbackBatch.cost_price,
+            fallbackBatch.mrp,
+          ]);
 
           // Deduct from the fallback batch (allowing negative)
-          await client.query(
-            "UPDATE product_batches SET quantity = quantity - $1 WHERE id = $2",
-            [remainingToDeduct, fallbackBatch.id],
-          );
+          await client.query(BATCH_QUERIES.UPDATE_QTY, [
+            remainingToDeduct,
+            fallbackBatch.id,
+          ]);
 
           // Record stock movement
-          await client.query(
-            "INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by, batch_id) VALUES ($1, $2, 'SALE', $3, $4, $5)",
-            [
-              item.product_id,
-              remainingToDeduct,
-              billNumber,
-              user_id,
-              fallbackBatch.id,
-            ],
-          );
+          await client.query(STOCK_QUERIES.RECORD_MOVEMENT, [
+            item.product_id,
+            remainingToDeduct,
+            "SALE",
+            billNumber,
+            user_id,
+            fallbackBatch.id,
+          ]);
         }
       }
     }
@@ -226,29 +205,8 @@ export const createBill = asyncHandler(async (req, res) => {
 
 export const getBillById = asyncHandler(async (req, res) => {
   const { bill_id } = req.params;
-  const { limit = 10, page = 1 } = req.query;
 
-  const { rows } = await pool.query(
-    `SELECT
-       b.id AS bill_id,
-       b.bill_number,
-       b.total_amount,
-       b.payment_method,
-       b.created_at,
-       bi.id AS item_id,
-       bi.quantity,
-       bi.price,
-       bi.line_total,
-       bi.product_name AS snapshot_name,
-       p.id AS product_id,
-       p.name AS current_name,
-       p.barcode AS product_barcode
-     FROM bills b
-     JOIN bill_items bi ON bi.bill_id = b.id
-     JOIN products p ON p.id = bi.product_id
-     WHERE b.id = $1 ORDER BY bi.id ASC`,
-    [bill_id],
-  );
+  const { rows } = await pool.query(BILL_QUERIES.GET_BY_ID, [bill_id]);
   if (!rows.length) throw new Error("Bill not found");
 
   const bill = {
@@ -265,6 +223,7 @@ export const getBillById = asyncHandler(async (req, res) => {
       quantity: row.quantity,
       price: row.price,
       line_total: row.line_total,
+      mrp: row.mrp,
     })),
   };
 
