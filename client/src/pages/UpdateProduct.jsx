@@ -26,6 +26,7 @@ const UpdateProduct = () => {
     product_name: '',
     barcode: '',
     selling_price: '',
+    mrp: '',
   });
 
   // Capture the return page from location state
@@ -42,6 +43,7 @@ const UpdateProduct = () => {
         product_name: product.name || '',
         barcode: product.barcode || '',
         selling_price: product.selling_price || '',
+        mrp: product.mrp || '',
       });
     } catch (err) {
       console.error('Failed to fetch product details:', err);
@@ -84,6 +86,7 @@ const UpdateProduct = () => {
       await productsApi.update(id, {
         ...formData,
         selling_price: parseFloat(formData.selling_price),
+        mrp: formData.mrp ? parseFloat(formData.mrp) : 0,
       });
 
       setStatus({
@@ -146,7 +149,7 @@ const UpdateProduct = () => {
 
         <Box component="form" onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={12}>
               <TextField
                 fullWidth
                 label="Product Name"
@@ -157,17 +160,20 @@ const UpdateProduct = () => {
                 placeholder="Enter product name"
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Barcode (Optional)"
                 name="barcode"
                 value={formData.barcode}
                 onChange={handleChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.preventDefault();
+                }}
                 placeholder="barcode"
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Selling Price"
@@ -176,6 +182,22 @@ const UpdateProduct = () => {
                 value={formData.selling_price}
                 onChange={handleChange}
                 required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">₹</InputAdornment>
+                  ),
+                }}
+                inputProps={{ step: '0.01', min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="M.R.P (Optional)"
+                name="mrp"
+                type="number"
+                value={formData.mrp}
+                onChange={handleChange}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">₹</InputAdornment>

@@ -4,6 +4,11 @@ import { getSuccessResponse } from "../utils/response.util.js";
 import { logEvent } from "../services/logs.service.js";
 import { withTransaction } from "../utils/transaction.util.js";
 import createHttpError from "http-errors";
+import {
+  PRODUCT_QUERIES,
+  BATCH_QUERIES,
+  STOCK_QUERIES,
+} from "../db/queries.js";
 
 export const getAllProducts = asyncHandler(async (req, res) => {
   const page = Math.max(parseInt(req.query.page) || 1, 1);
@@ -11,59 +16,15 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit;
   const search = req.query.search?.trim();
 
-  let whereClause = ``;
-  const values = [];
-  let paramIndex = 1;
-
-  // Search by name OR barcode
-  if (search) {
-    whereClause += `
-      WHERE (
-        name ILIKE $${paramIndex}
-        OR barcode ILIKE $${paramIndex}
-      )
-    `;
-    values.push(`%${search}%`);
-    paramIndex++;
-  }
-
   // Projection based on role
   const isAdmin = req.user.role === "ADMIN";
-  // Data query
-  const productsQuery = `
-    SELECT 
-      p.id, p.name, p.barcode, p.selling_price,
-      s.stock_qty, lb.batch_no as latest_batch ${isAdmin ? ", s.cost_price, p.updated_at, p.updated_by, p.created_by, p.created_at" : ""}
-    FROM products p
-    LEFT JOIN (
-      SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
-      FROM product_batches 
-      GROUP BY product_id
-    ) s ON p.id = s.product_id
-    LEFT JOIN LATERAL (
-      SELECT batch_no
-      FROM product_batches pb
-      WHERE pb.product_id = p.id
-      ORDER BY pb.created_at DESC
-      LIMIT 1
-    ) lb ON true
-    ${search ? `WHERE (p.name ILIKE $1 OR p.barcode ILIKE $1)` : ""}
-    ORDER BY p.created_at DESC
-    LIMIT $${search ? 2 : 1} OFFSET $${search ? 3 : 2}
-  `;
 
-  values.push(limit, offset);
-
-  // Count query
-  const countQuery = `
-    SELECT COUNT(*)
-    FROM products
-    ${whereClause}
-  `;
+  const query = PRODUCT_QUERIES.GET_ALL(isAdmin, search, limit, offset);
+  const countQuery = PRODUCT_QUERIES.COUNT(search);
 
   const [productsRes, countRes] = await Promise.all([
-    pool.query(productsQuery, values),
-    pool.query(countQuery, values.slice(0, paramIndex - 1)),
+    pool.query(query.text, query.values),
+    pool.query(countQuery.text, countQuery.values),
   ]);
 
   const total = Number(countRes.rows[0].count);
@@ -88,21 +49,8 @@ export const getAllProducts = asyncHandler(async (req, res) => {
 export const getProductByBarcode = asyncHandler(async (req, res) => {
   const { barcode } = req.params;
   const isAdmin = req.user.role === "ADMIN";
-  const fields = isAdmin
-    ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date"
-    : "p.id, p.name, p.barcode, p.selling_price, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
 
-  const query = `
-    SELECT ${fields} 
-    FROM products p 
-    LEFT JOIN (
-      SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
-      FROM product_batches 
-      GROUP BY product_id
-    ) s ON p.id = s.product_id
-    LEFT JOIN product_batches b ON p.id = b.product_id AND b.batch_no = 'INITIAL'
-    WHERE p.barcode = $1
-  `;
+  const query = PRODUCT_QUERIES.GET_BY_BARCODE(isAdmin);
   const { rows } = await pool.query(query, [barcode]);
 
   if (rows.length === 0) {
@@ -120,21 +68,8 @@ export const getProductByBarcode = asyncHandler(async (req, res) => {
 
 export const getProductById = asyncHandler(async (req, res) => {
   const isAdmin = req.user.role === "ADMIN";
-  const fields = isAdmin
-    ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date"
-    : "p.id, p.name, p.barcode, p.selling_price, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
 
-  const query = `
-    SELECT ${fields} 
-    FROM products p 
-    LEFT JOIN (
-      SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
-      FROM product_batches 
-      GROUP BY product_id
-    ) s ON p.id = s.product_id
-    LEFT JOIN product_batches b ON p.id = b.product_id AND b.batch_no = 'INITIAL'
-    WHERE p.id = $1
-  `;
+  const query = PRODUCT_QUERIES.GET_BY_ID(isAdmin);
   const { rows } = await pool.query(query, [req.params.product_id]);
 
   if (rows.length === 0) {
@@ -159,6 +94,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     quantity,
     cost_price,
     expiry_date,
+    mrp,
   } = req.body;
   const { user_id } = req.user;
 
@@ -167,14 +103,12 @@ export const createProduct = asyncHandler(async (req, res) => {
 
     try {
       // 1. Create Product
-      const productRes = await client.query(
-        `
-        INSERT INTO products (name, barcode, selling_price, created_by)
-        VALUES ($1, $2, $3, $4)
-        RETURNING *
-        `,
-        [name, barcode || null, selling_price, user_id],
-      );
+      const productRes = await client.query(PRODUCT_QUERIES.CREATE, [
+        name,
+        barcode || null,
+        selling_price,
+        user_id,
+      ]);
 
       product = productRes.rows[0];
 
@@ -183,33 +117,28 @@ export const createProduct = asyncHandler(async (req, res) => {
       const initialQty = quantity || 0;
       const initialCost = cost_price || 0;
 
-      const batchRes = await client.query(
-        `
-        INSERT INTO product_batches (product_id, batch_no, quantity, cost_price, expiry_date, created_by)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id
-        `,
-        [
-          product.id,
-          initialBatchNo,
-          initialQty,
-          initialCost,
-          expiry_date || null,
-          user_id,
-        ],
-      );
+      const batchRes = await client.query(BATCH_QUERIES.CREATE_INITIAL, [
+        product.id,
+        initialBatchNo,
+        initialQty,
+        initialCost,
+        mrp || 0,
+        expiry_date || null,
+        user_id,
+      ]);
 
       const batch = batchRes.rows[0];
 
       // 3. Record Stock Movement if quantity is provided
       if (initialQty > 0) {
-        await client.query(
-          `
-          INSERT INTO stock_movements (product_id, quantity, movement_type, reference, created_by, batch_id)
-          VALUES ($1, $2, $3, $4, $5, $6)
-          `,
-          [product.id, initialQty, "IN", "INITIAL_STOCK", user_id, batch.id],
-        );
+        await client.query(STOCK_QUERIES.RECORD_MOVEMENT, [
+          product.id,
+          initialQty,
+          "IN",
+          "INITIAL_STOCK",
+          user_id,
+          batch.id,
+        ]);
       }
     } catch (err) {
       if (err.code === "23505") {
@@ -235,7 +164,7 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { product_name: name, barcode, selling_price } = req.body;
+  const { product_name: name, barcode, selling_price, mrp } = req.body;
 
   const { user_id } = req.user;
   const productId = req.params.product_id;
@@ -254,22 +183,23 @@ export const updateProduct = asyncHandler(async (req, res) => {
     const oldProduct = rows[0];
 
     /* Update product (only provided fields) */
-    const updateRes = await client.query(
-      `
-      UPDATE products
-      SET
-        name = COALESCE($1, name),
-        barcode = COALESCE($2, barcode),
-        selling_price = COALESCE($3, selling_price),
-        updated_by = $4,
-        updated_at = NOW()
-      WHERE id = $5
-      RETURNING *
-      `,
-      [name, barcode ?? null, selling_price, user_id, productId],
-    );
+    const updateRes = await client.query(PRODUCT_QUERIES.UPDATE, [
+      name,
+      barcode ?? null,
+      selling_price,
+      user_id,
+      productId,
+    ]);
 
     const updatedProduct = updateRes.rows[0];
+
+    /* Update MRP in the INITIAL batch if provided */
+    if (mrp !== undefined) {
+      await client.query(
+        `UPDATE product_batches SET mrp = $1 WHERE product_id = $2 AND batch_no = 'INITIAL'`,
+        [mrp || 0, productId],
+      );
+    }
 
     /* Log product update with old vs new metadata */
     await logEvent(
@@ -284,11 +214,13 @@ export const updateProduct = asyncHandler(async (req, res) => {
           name: oldProduct.name,
           barcode: oldProduct.barcode,
           selling_price: oldProduct.selling_price,
+          mrp: oldProduct.mrp,
         },
         new: {
           name: updatedProduct.name,
           barcode: updatedProduct.barcode,
           selling_price: updatedProduct.selling_price,
+          mrp: mrp !== undefined ? mrp : oldProduct.mrp,
         },
       },
     );

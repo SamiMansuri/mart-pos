@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { isAdmin } from '../utils/auth.utils';
 import { authApi } from '../api/api';
+import { useEffect } from 'react';
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -79,6 +80,42 @@ const Layout = () => {
     { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
     { text: 'History', icon: <HistoryIcon />, path: '/history' },
   ];
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'F5') {
+        e.preventDefault();
+      }
+
+      if (e.key === 'F1') {
+        e.preventDefault();
+      }
+
+      if (e.key === 'F3') {
+        e.preventDefault();
+        navigate('/admin/products/add');
+      }
+
+      if (e.key === 'F4') {
+        e.preventDefault();
+        navigate('/cashier');
+      }
+
+      if (e.key === 'F6') {
+        e.preventDefault();
+        navigate('/cashier/return');
+      }
+
+      if (e.key === 'F7') {
+        e.preventDefault();
+        navigate('/admin/products');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [navigate]);
 
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>

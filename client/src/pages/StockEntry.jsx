@@ -32,6 +32,7 @@ const StockEntry = () => {
     expiry_date: '',
     cost_price: '',
     quantity: '',
+    mrp: '',
   });
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,6 +91,7 @@ const StockEntry = () => {
         product_id: selectedProduct.id,
         ...formData,
         cost_price: parseFloat(formData.cost_price) || 0,
+        mrp: parseFloat(formData.mrp) || 0,
         quantity: parseInt(formData.quantity, 10),
       });
 
@@ -103,6 +105,7 @@ const StockEntry = () => {
         batch_no: '',
         expiry_date: '',
         cost_price: '',
+        mrp: '',
         quantity: '',
       });
       setSelectedProduct(null);
@@ -165,6 +168,9 @@ const StockEntry = () => {
                     {...params}
                     label="Search Product"
                     required
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.preventDefault();
+                    }}
                     placeholder="Enter product name or barcode"
                     sx={{
                       minWidth: '260px',
@@ -255,6 +261,22 @@ const StockEntry = () => {
                 name="cost_price"
                 type="number"
                 value={formData.cost_price}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">₹</InputAdornment>
+                  ),
+                }}
+                inputProps={{ step: '0.01', min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="MRP"
+                name="mrp"
+                type="number"
+                value={formData.mrp}
                 onChange={handleChange}
                 InputProps={{
                   startAdornment: (
