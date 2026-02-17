@@ -13,7 +13,7 @@ import {
 import { BILL_QUERIES, BATCH_QUERIES, STOCK_QUERIES } from "../db/queries.js";
 
 export const createBill = asyncHandler(async (req, res) => {
-  const { items, payment_method, idempotency_key, business_date } = req.body;
+  const { items, payment_method, idempotency_key, business_date, round_adjustment } = req.body;
   const { user_id } = req.user;
 
   if (!idempotency_key) {
@@ -33,7 +33,7 @@ export const createBill = asyncHandler(async (req, res) => {
       return { isNew: false, bill: existingBill.rows[0] };
     }
 
-    let totalAmount = 0;
+    let subTotal = 0;
 
     const productMap = new Map();
 
@@ -52,7 +52,7 @@ export const createBill = asyncHandler(async (req, res) => {
       const product = rows[0];
       productMap.set(item.product_id, product);
 
-      totalAmount += product.selling_price * item.quantity;
+      subTotal += product.selling_price * item.quantity;
     }
 
     const counterRes = await client.query(
@@ -75,6 +75,8 @@ export const createBill = asyncHandler(async (req, res) => {
 
     const billNumber = `BILL-${Date.now()}`;
 
+    const totalAmount = subTotal + round_adjustment;
+
     const billRes = await client.query(BILL_QUERIES.CREATE, [
       billNumber,
       totalAmount,
@@ -83,6 +85,8 @@ export const createBill = asyncHandler(async (req, res) => {
       user_id,
       nextNumber,
       business_date,
+      subTotal,
+      round_adjustment,
     ]);
 
     await logBillEvent({
@@ -905,7 +909,8 @@ export const getBillDetailsForAdmin = asyncHandler(async (req, res) => {
       refunds: refundsRes.rows,
       events: eventsRes.rows,
       summary: {
-        gross_amount: Number(bill.total_amount),
+        sub_total: Number(bill.sub_total || 0),
+        round_adjustment: Number(bill.round_adjustment || 0),
         total_returned: totalReturned,
         total_refunded: totalRefunded,
         net_value: Number(bill.total_amount) - totalReturned,
