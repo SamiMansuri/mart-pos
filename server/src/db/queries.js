@@ -151,7 +151,7 @@ export const BILL_QUERIES = {
     WHERE business_date = $2
   `,
   CREATE:
-    "INSERT INTO bills (bill_number, total_amount, payment_method, idempotency_key, created_by, payment_status, invoice_number, business_date) VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7) RETURNING *",
+    "INSERT INTO bills (bill_number, total_amount, payment_method, idempotency_key, created_by, payment_status, invoice_number, business_date, sub_total, round_adjustment) VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7, $8, $9) RETURNING *",
   CREATE_ITEM:
     "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price, mrp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
   GET_BY_ID: `SELECT

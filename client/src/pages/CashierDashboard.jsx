@@ -59,6 +59,7 @@ const CashierDashboard = () => {
   const searchRef = useRef(null);
   const [activeSection, setActiveSection] = useState('SEARCH'); // 'SEARCH', 'CART', 'BILL_SUMMARY'
   const [selectedCartIndex, setSelectedCartIndex] = useState(-1);
+  const [roundAdjust, setRoundAdjust] = useState(0);
   const qtyRefs = useRef([]);
 
   // Barcode Scanning State
@@ -97,19 +98,23 @@ const CashierDashboard = () => {
 
   const addToCart = useCallback((product) => {
     setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.id === product.id);
-      const otherItems = prevCart.filter((item) => item.id !== product.id);
+      const existingItemIndex = prevCart.findIndex(
+        (item) => item.id === product.id,
+      );
 
-      if (existingItem) {
-        return [
-          { ...existingItem, quantity: existingItem.quantity + 1 },
-          ...otherItems,
-        ];
+      if (existingItemIndex > -1) {
+        const newCart = [...prevCart];
+        newCart[existingItemIndex] = {
+          ...newCart[existingItemIndex],
+          quantity: newCart[existingItemIndex].quantity + 1,
+        };
+        return newCart;
       } else {
-        return [{ ...product, quantity: 1 }, ...otherItems];
+        const newCart = [...prevCart, { ...product, quantity: 1 }];
+        return newCart;
       }
     });
-    // Always select the top (most recent) item
+    // Always select the first item
     setSelectedCartIndex(0);
   }, []);
 
@@ -146,7 +151,6 @@ const CashierDashboard = () => {
         setBarcodeValue('');
         setSearchTerm(''); // Clear search term to remove any leaked characters
         setActiveSection('CART'); // Move to cart after scanning
-        setSelectedCartIndex(0);
       }
     },
     [playBeep, playErrorSound, addToCart],
@@ -332,10 +336,12 @@ const CashierDashboard = () => {
     [],
   );
 
-  const total = cart.reduce(
+  const subTotal = cart.reduce(
     (sum, item) => sum + item.selling_price * item.quantity,
     0,
   );
+
+  const total = subTotal + Number(roundAdjust || 0);
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -395,6 +401,7 @@ const CashierDashboard = () => {
         payment_method: paymentMethod,
         idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         business_date: new Date().toISOString().split('T')[0],
+        round_adjustment: Number(roundAdjust || 0),
       });
 
       setStatus({
@@ -419,6 +426,7 @@ const CashierDashboard = () => {
 
       setCart([]);
       setPaymentMethod('CASH'); // Reset payment method after checkout
+      setRoundAdjust(0); // Reset round adjust after checkout
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Checkout failed' });
@@ -576,6 +584,13 @@ const CashierDashboard = () => {
                   placeholder="Search product by name or scan barcode"
                   variant="outlined"
                   inputRef={searchRef}
+                  onFocus={() => {
+                    // Scroll search input into view when focused
+                    searchRef.current?.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'center',
+                    });
+                  }}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (
@@ -854,7 +869,47 @@ const CashierDashboard = () => {
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography color="text.secondary">Subtotal</Typography>
-                <Typography fontWeight={600}>₹{total.toFixed(2)}</Typography>
+                <Typography fontWeight={600}>₹{subTotal.toFixed(2)}</Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Typography color="text.secondary">Round Adjust</Typography>
+                <TextField
+                  size="small"
+                  type="number"
+                  value={roundAdjust}
+                  onChange={(e) => setRoundAdjust(e.target.value)}
+                  onFocus={(e) => {
+                    e.target.select();
+                    setActiveSection('BILL_SUMMARY');
+                  }}
+                  onBlur={() => {
+                    if (roundAdjust === '' || isNaN(parseFloat(roundAdjust))) {
+                      setRoundAdjust(0);
+                    }
+                  }}
+                  inputProps={{
+                    style: {
+                      textAlign: 'right',
+                      padding: '4px 8px',
+                      width: '80px',
+                      fontWeight: 600,
+                    },
+                  }}
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1.5,
+                      backgroundColor: 'rgba(0,0,0,0.02)',
+                    },
+                  }}
+                />
               </Box>
 
               <Divider sx={{ my: 1 }} />
