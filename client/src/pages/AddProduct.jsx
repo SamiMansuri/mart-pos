@@ -32,6 +32,7 @@ const AddProduct = () => {
     cost_price: '',
     mrp: '',
     expiry_date: '',
+    sale_type: 'UNIT',
   });
 
   const handleChange = (e) => {
@@ -58,10 +59,15 @@ const AddProduct = () => {
     setStatus({ type: '', message: '' });
 
     try {
+      const qty = formData.quantity
+        ? formData.sale_type === 'UNIT'
+          ? parseInt(formData.quantity, 10)
+          : parseFloat(formData.quantity)
+        : 0;
       await productsApi.create({
         ...formData,
         selling_price: parseFloat(formData.selling_price),
-        quantity: formData.quantity ? parseFloat(formData.quantity) : 0,
+        quantity: qty,
         cost_price: formData.cost_price ? parseFloat(formData.cost_price) : 0,
         mrp: formData.mrp ? parseFloat(formData.mrp) : 0,
       });
@@ -81,6 +87,7 @@ const AddProduct = () => {
         cost_price: '',
         mrp: '',
         expiry_date: '',
+        sale_type: 'UNIT',
       });
 
       // Focus on product name field (optional but helpful)
@@ -243,15 +250,33 @@ const AddProduct = () => {
               />
             </Grid>
             <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Sale Type</InputLabel>
+                <Select
+                  name="sale_type"
+                  value={formData.sale_type}
+                  label="Sale Type"
+                  onChange={handleChange}
+                >
+                  <MenuItem value="UNIT">UNIT (by piece)</MenuItem>
+                  <MenuItem value="WEIGHT">WEIGHT (by quantity)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
-                label="Quantity (Optional)"
+                label="Stock Quantity (Optional)"
                 name="quantity"
                 type="number"
                 value={formData.quantity}
                 onChange={handleChange}
-                placeholder="Initial stock"
-                inputProps={{ min: '0' }}
+                placeholder={formData.sale_type === 'UNIT' ? 'Whole number' : 'Decimal allowed'}
+                inputProps={{
+                  min: '0',
+                  step: formData.sale_type === 'UNIT' ? '1' : '0.001',
+                  inputMode: formData.sale_type === 'UNIT' ? 'numeric' : 'decimal',
+                }}
               />
             </Grid>
 
