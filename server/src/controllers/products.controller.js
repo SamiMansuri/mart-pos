@@ -95,6 +95,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     cost_price,
     expiry_date,
     mrp,
+    sale_type,
   } = req.body;
   const { user_id } = req.user;
 
@@ -108,6 +109,7 @@ export const createProduct = asyncHandler(async (req, res) => {
         barcode || null,
         selling_price,
         user_id,
+        sale_type || 'UNIT',
       ]);
 
       product = productRes.rows[0];
@@ -164,7 +166,7 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { product_name: name, barcode, selling_price, mrp } = req.body;
+  const { product_name: name, barcode, selling_price, mrp, sale_type } = req.body;
 
   const { user_id } = req.user;
   const productId = req.params.product_id;
@@ -189,6 +191,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
       selling_price,
       user_id,
       productId,
+      sale_type ?? null,
     ]);
 
     const updatedProduct = updateRes.rows[0];

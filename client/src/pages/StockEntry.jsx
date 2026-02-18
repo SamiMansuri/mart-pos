@@ -92,7 +92,7 @@ const StockEntry = () => {
         ...formData,
         cost_price: parseFloat(formData.cost_price) || 0,
         mrp: parseFloat(formData.mrp) || 0,
-        quantity: parseInt(formData.quantity, 10),
+        quantity: selectedProduct.sale_type === 'WEIGHT' ? parseFloat(formData.quantity) : parseInt(formData.quantity, 10),
       });
 
       setStatus({
@@ -251,7 +251,10 @@ const StockEntry = () => {
                 value={formData.quantity}
                 onChange={handleChange}
                 required
-                inputProps={{ min: '1' }}
+                inputProps={{
+                  min: selectedProduct?.sale_type === 'WEIGHT' ? '0.001' : '1',
+                  step: selectedProduct?.sale_type === 'WEIGHT' ? '0.001' : '1'
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>

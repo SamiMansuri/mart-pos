@@ -6,7 +6,7 @@ export const PRODUCT_QUERIES = {
     return {
       text: `
         SELECT 
-          p.id, p.name, p.barcode, p.selling_price, s.mrp,
+          p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp,
           s.stock_qty, lb.batch_no as latest_batch, lb.mrp ${isAdminField}
         FROM products p
         LEFT JOIN (
@@ -41,7 +41,7 @@ export const PRODUCT_QUERIES = {
   GET_BY_BARCODE: (isAdmin) => {
     const fields = isAdmin
       ? "p.*, s.stock_qty, s.cost_price, s.mrp, b.batch_no, b.expiry_date"
-      : "p.id, p.name, p.barcode, p.selling_price, s.mrp, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
+      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
     return `
       SELECT ${fields} 
       FROM products p 
@@ -57,7 +57,7 @@ export const PRODUCT_QUERIES = {
   GET_BY_ID: (isAdmin) => {
     const fields = isAdmin
       ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, s.mrp"
-      : "p.id, p.name, p.barcode, p.selling_price, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, s.mrp";
+      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, s.mrp";
     return `
       SELECT ${fields} 
       FROM products p 
@@ -71,8 +71,8 @@ export const PRODUCT_QUERIES = {
     `;
   },
   CREATE: `
-    INSERT INTO products (name, barcode, selling_price, created_by)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO products (name, barcode, selling_price, created_by, sale_type)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING *
   `,
   UPDATE: `
@@ -82,7 +82,8 @@ export const PRODUCT_QUERIES = {
       barcode = COALESCE($2, barcode),
       selling_price = COALESCE($3, selling_price),
       updated_by = $4,
-      updated_at = NOW()
+      updated_at = NOW(),
+      sale_type = COALESCE($6, sale_type)
     WHERE id = $5
     RETURNING *
   `,
@@ -168,7 +169,8 @@ export const BILL_QUERIES = {
        bi.mrp,
        p.id AS product_id,
        p.name AS current_name,
-       p.barcode AS product_barcode
+       p.barcode AS product_barcode,
+       p.sale_type
      FROM bills b
      JOIN bill_items bi ON bi.bill_id = b.id
      JOIN products p ON p.id = bi.product_id

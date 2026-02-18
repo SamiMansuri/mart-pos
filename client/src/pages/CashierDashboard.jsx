@@ -319,13 +319,28 @@ const CashierDashboard = () => {
       setCart((prevCart) =>
         prevCart.map((item) => {
           if (item.id === productId) {
+            const isWeight = item.sale_type === 'WEIGHT';
             let newQty;
             if (isManual) {
-              newQty = deltaOrQty === '' ? '' : parseInt(deltaOrQty, 10);
-              if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1))
-                return item;
+              if (isWeight) {
+                // For WEIGHT: store the raw string while typing so "1." doesn't snap back
+                // Only reject if it's clearly invalid (non-numeric characters)
+                if (deltaOrQty === '') return { ...item, quantity: '' };
+                if (!/^\d*\.?\d*$/.test(deltaOrQty)) return item;
+                return { ...item, quantity: deltaOrQty };
+              } else {
+                // For UNIT: integers only
+                newQty = deltaOrQty === '' ? '' : parseInt(deltaOrQty, 10);
+                if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1)) return item;
+              }
             } else {
-              newQty = Math.max(1, item.quantity + deltaOrQty);
+              // +/- buttons: always numeric
+              const current = parseFloat(item.quantity) || (isWeight ? 0.001 : 1);
+              newQty = Math.max(isWeight ? 0.001 : 1, current + deltaOrQty);
+              if (isWeight) {
+                // Round to 3 decimal places to avoid floating point drift
+                newQty = Math.round(newQty * 1000) / 1000;
+              }
             }
             return { ...item, quantity: newQty };
           }
@@ -336,14 +351,15 @@ const CashierDashboard = () => {
     [],
   );
 
+
   const subTotal = cart.reduce(
-    (sum, item) => sum + item.selling_price * item.quantity,
+    (sum, item) => sum + item.selling_price * (parseFloat(item.quantity) || 0),
     0,
   );
 
   const total = subTotal + Number(roundAdjust || 0);
 
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = cart.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
 
   const printBill = async (
     cartItems,
@@ -391,7 +407,7 @@ const CashierDashboard = () => {
     try {
       const items = cart.map((item) => ({
         product_id: item.id,
-        quantity: item.quantity,
+        quantity: parseFloat(item.quantity) || 0,
       }));
       const currentCart = [...cart];
       const currentTotal = total;
@@ -745,7 +761,7 @@ const CashierDashboard = () => {
                         >
                           <IconButton
                             size="small"
-                            onClick={() => updateQuantity(item.id, -1)}
+                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? -0.5 : -1)}
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <RemoveIcon fontSize="small" />
@@ -763,23 +779,39 @@ const CashierDashboard = () => {
                               setSelectedCartIndex(index);
                             }}
                             onBlur={(e) => {
+                              const isWeight = item.sale_type === 'WEIGHT';
+                              const minQty = isWeight ? 0.001 : 1;
+                              const parsed = parseFloat(e.target.value);
                               if (
                                 e.target.value === '' ||
-                                parseInt(e.target.value, 10) < 1
+                                isNaN(parsed) ||
+                                parsed < minQty
                               ) {
-                                updateQuantity(item.id, 1, true);
+                                // Snap to minimum
+                                setCart((prev) =>
+                                  prev.map((ci) =>
+                                    ci.id === item.id ? { ...ci, quantity: minQty } : ci
+                                  )
+                                );
+                              } else {
+                                // Commit the parsed number (removes trailing dots)
+                                setCart((prev) =>
+                                  prev.map((ci) =>
+                                    ci.id === item.id ? { ...ci, quantity: parsed } : ci
+                                  )
+                                );
                               }
                             }}
                             inputProps={{
                               style: {
                                 textAlign: 'center',
                                 padding: '4px 0',
-                                width: '40px',
+                                width: '50px',
                                 fontWeight: 700,
                                 fontSize: '0.875rem',
                               },
-                              inputMode: 'numeric',
-                              pattern: '[0-9]*',
+                              inputMode: item.sale_type === 'WEIGHT' ? 'decimal' : 'numeric',
+                              pattern: item.sale_type === 'WEIGHT' ? '[0-9]*\.?[0-9]*' : '[0-9]*',
                             }}
                             variant="outlined"
                             sx={{
@@ -798,7 +830,7 @@ const CashierDashboard = () => {
                           />
                           <IconButton
                             size="small"
-                            onClick={() => updateQuantity(item.id, 1)}
+                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? 0.5 : 1)}
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <AddIcon fontSize="small" />
