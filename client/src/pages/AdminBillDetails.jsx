@@ -354,7 +354,7 @@ const AdminBillDetails = () => {
 
             <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                Gross Amount
+                Subtotal
               </Typography>
               <Box
                 sx={{
@@ -365,7 +365,24 @@ const AdminBillDetails = () => {
                 }}
               />
               <Typography variant="body2" fontWeight={600}>
-                ₹{summary.gross_amount.toFixed(2)}
+                ₹{summary.sub_total.toFixed(2)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Round Adjust
+              </Typography>
+              <Box
+                sx={{
+                  flex: 1,
+                  borderBottom: '1px dotted',
+                  borderColor: 'divider',
+                  mx: 1.5,
+                }}
+              />
+              <Typography variant="body2" fontWeight={600} color={summary.round_adjustment < 0 ? 'error.main' : 'text.primary'}>
+                {summary.round_adjustment >= 0 ? '+' : ''}₹{summary.round_adjustment.toFixed(2)}
               </Typography>
             </Box>
 
