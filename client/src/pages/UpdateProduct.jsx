@@ -11,6 +11,10 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { productsApi } from '../api/api';
@@ -27,6 +31,7 @@ const UpdateProduct = () => {
     barcode: '',
     selling_price: '',
     mrp: '',
+    sale_type: 'UNIT',
   });
 
   // Capture the return page from location state
@@ -44,6 +49,7 @@ const UpdateProduct = () => {
         barcode: product.barcode || '',
         selling_price: product.selling_price || '',
         mrp: product.mrp || '',
+        sale_type: product.sale_type || 'UNIT',
       });
     } catch (err) {
       console.error('Failed to fetch product details:', err);
@@ -205,6 +211,20 @@ const UpdateProduct = () => {
                 }}
                 inputProps={{ step: '0.01', min: '0' }}
               />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Sale Type</InputLabel>
+                <Select
+                  name="sale_type"
+                  value={formData.sale_type}
+                  label="Sale Type"
+                  onChange={handleChange}
+                >
+                  <MenuItem value="UNIT">UNIT (by piece)</MenuItem>
+                  <MenuItem value="WEIGHT">WEIGHT (by quantity)</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
 
             <Grid item xs={12} sx={{ mt: 2 }}>
