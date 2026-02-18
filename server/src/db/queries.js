@@ -168,7 +168,8 @@ export const BILL_QUERIES = {
        bi.mrp,
        p.id AS product_id,
        p.name AS current_name,
-       p.barcode AS product_barcode
+       p.barcode AS product_barcode,
+       p.sale_type
      FROM bills b
      JOIN bill_items bi ON bi.bill_id = b.id
      JOIN products p ON p.id = bi.product_id
