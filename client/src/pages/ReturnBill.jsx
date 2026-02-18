@@ -96,18 +96,40 @@ const ReturnBill = () => {
 
   const handleQtyChange = (productId, delta, max) => {
     setReturnItems((prev) => {
-      const current = prev[productId] || 0;
-      const next = current + delta;
+      const current = parseFloat(prev[productId]) || 0;
+      let next = current + delta;
+
+      // Handle floating point precision
+      next = Math.round(next * 1000) / 1000;
+
       if (next < 0 || next > max) return prev;
       return { ...prev, [productId]: next };
     });
   };
 
+  const handleManualQtyChange = (productId, value, max, saleType) => {
+    setReturnItems((prev) => {
+      if (saleType === 'WEIGHT') {
+        if (value === '') return { ...prev, [productId]: '' };
+        if (!/^\d*\.?\d*$/.test(value)) return prev;
+        const numValue = parseFloat(value);
+        if (numValue > max) return { ...prev, [productId]: max };
+        return { ...prev, [productId]: value };
+      } else {
+        if (value === '') return { ...prev, [productId]: '' };
+        const numValue = parseInt(value, 10);
+        if (isNaN(numValue) || numValue < 0) return prev;
+        if (numValue > max) return { ...prev, [productId]: max };
+        return { ...prev, [productId]: numValue };
+      }
+    });
+  };
+
   const totalReturnAmount = bill
     ? bill.items.reduce((sum, item) => {
-        const qty = returnItems[item.product_id] || 0;
-        return sum + Number(item.price) * qty;
-      }, 0)
+      const qty = returnItems[item.product_id] || 0;
+      return sum + Number(item.price) * qty;
+    }, 0)
     : 0;
 
   const handleConfirmReturn = async () => {
@@ -118,7 +140,7 @@ const ReturnBill = () => {
         .filter(([_, qty]) => qty > 0)
         .map(([productId, qty]) => ({
           product_id: Number(productId),
-          quantity: qty,
+          quantity: parseFloat(qty),
         }));
 
       if (items.length === 0) throw new Error('No items selected for return');
@@ -291,7 +313,7 @@ const ReturnBill = () => {
                               onClick={() =>
                                 handleQtyChange(
                                   item.product_id,
-                                  -1,
+                                  item.sale_type === 'WEIGHT' ? -0.5 : -1,
                                   item.quantity,
                                 )
                               }
@@ -299,15 +321,42 @@ const ReturnBill = () => {
                             >
                               <RemoveIcon fontSize="small" />
                             </IconButton>
-                            <Typography fontWeight={600}>
-                              {returnItems[item.product_id] || 0}
-                            </Typography>
+                            <TextField
+                              size="small"
+                              value={returnItems[item.product_id] !== undefined ? returnItems[item.product_id] : 0}
+                              onChange={(e) => handleManualQtyChange(item.product_id, e.target.value, item.quantity, item.sale_type)}
+                              onBlur={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (isNaN(val) || val < 0) {
+                                  setReturnItems(prev => ({ ...prev, [item.product_id]: 0 }));
+                                } else if (val > item.quantity) {
+                                  setReturnItems(prev => ({ ...prev, [item.product_id]: item.quantity }));
+                                } else {
+                                  // Commit the parsed number (removes trailing dots)
+                                  setReturnItems(prev => ({ ...prev, [item.product_id]: val }));
+                                }
+                              }}
+                              inputProps={{
+                                style: {
+                                  textAlign: 'center',
+                                  width: '50px',
+                                  fontWeight: 600,
+                                  padding: '4px 0',
+                                },
+                                inputMode: item.sale_type === 'WEIGHT' ? 'decimal' : 'numeric',
+                              }}
+                              sx={{
+                                '& .MuiOutlinedInput-input': {
+                                  textAlign: 'center',
+                                },
+                              }}
+                            />
                             <IconButton
                               size="small"
                               onClick={() =>
                                 handleQtyChange(
                                   item.product_id,
-                                  1,
+                                  item.sale_type === 'WEIGHT' ? 0.5 : 1,
                                   item.quantity,
                                 )
                               }
