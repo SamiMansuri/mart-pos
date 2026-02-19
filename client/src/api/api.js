@@ -119,6 +119,11 @@ export const authApi = {
     apiFetch('/auth/logout', {
       method: 'POST',
     }),
+  changePassword: (passwords) =>
+    apiFetch('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(passwords),
+    }),
 };
 
 export const usersApi = {

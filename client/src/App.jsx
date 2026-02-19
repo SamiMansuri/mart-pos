@@ -17,6 +17,7 @@ import BillView from './pages/BillView';
 import AdminBillDetails from './pages/AdminBillDetails';
 import Reports from './pages/Reports';
 import StockEntry from './pages/StockEntry';
+import ChangePassword from './pages/ChangePassword';
 import { getUserInfo, isTokenExpired } from './utils/auth.utils';
 
 // Guard for authenticated sessions
@@ -201,6 +202,15 @@ function App() {
             element={
               <RoleGuard allowedRoles={['admin']}>
                 <Reports />
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="change-password"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <ChangePassword />
               </RoleGuard>
             }
           />

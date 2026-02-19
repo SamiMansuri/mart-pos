@@ -1,4 +1,4 @@
-import { comparePassword } from "../utils/password.js";
+import { comparePassword, hashPassword } from "../utils/password.js";
 import { signToken } from "../utils/jwt.js";
 import pool from "../config/db.config.js";
 import createHttpError from "http-errors";
@@ -52,6 +52,45 @@ export const logout = asyncHandler(async (req, res) => {
   res.json(
     getSuccessResponse({
       message: "Logout successful",
+      status: 200,
+    }),
+  );
+});
+
+export const changePassword = asyncHandler(async (req, res) => {
+  const { user_id } = req.user;
+  const { old_password, new_password } = req.body;
+
+  if (!old_password || !new_password) {
+    throw createHttpError(400, "old_password and new_password required");
+  }
+
+  const result = await pool.query(
+    "SELECT * FROM users WHERE id = $1 AND is_active = true",
+    [user_id],
+  );
+
+  const user = result.rows[0];
+  if (!user) {
+    throw createHttpError(401, "Invalid credentials");
+  }
+
+  const isMatch = await comparePassword(old_password, user.password);
+  if (!isMatch) {
+    throw createHttpError(401, "Invalid credentials");
+  }
+
+  const hashedPassword = await hashPassword(new_password);
+  await pool.query("UPDATE users SET password = $1 WHERE id = $2", [
+    hashedPassword,
+    user_id,
+  ]);
+
+  await logEvent(pool, "USER_PASSWORD_CHANGED", user_id, "USER", user_id);
+
+  res.json(
+    getSuccessResponse({
+      message: "Password changed successfully",
       status: 200,
     }),
   );
