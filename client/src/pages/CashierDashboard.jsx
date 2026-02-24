@@ -108,14 +108,14 @@ const CashierDashboard = () => {
           ...newCart[existingItemIndex],
           quantity: newCart[existingItemIndex].quantity + 1,
         };
+        setSelectedCartIndex(existingItemIndex);
         return newCart;
       } else {
         const newCart = [...prevCart, { ...product, quantity: 1 }];
+        setSelectedCartIndex(newCart.length - 1);
         return newCart;
       }
     });
-    // Always select the first item
-    setSelectedCartIndex(0);
   }, []);
 
   const fetchProducts = useCallback(async (term) => {
@@ -331,11 +331,13 @@ const CashierDashboard = () => {
               } else {
                 // For UNIT: integers only
                 newQty = deltaOrQty === '' ? '' : parseInt(deltaOrQty, 10);
-                if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1)) return item;
+                if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1))
+                  return item;
               }
             } else {
               // +/- buttons: always numeric
-              const current = parseFloat(item.quantity) || (isWeight ? 0.001 : 1);
+              const current =
+                parseFloat(item.quantity) || (isWeight ? 0.001 : 1);
               newQty = Math.max(isWeight ? 0.001 : 1, current + deltaOrQty);
               if (isWeight) {
                 // Round to 3 decimal places to avoid floating point drift
@@ -351,15 +353,17 @@ const CashierDashboard = () => {
     [],
   );
 
-
   const subTotal = cart.reduce(
     (sum, item) => sum + item.selling_price * (parseFloat(item.quantity) || 0),
     0,
   );
 
-  const total = subTotal + Number(roundAdjust || 0);
+  const total = subTotal - Number(roundAdjust || 0);
 
-  const totalItems = cart.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+  const totalItems = cart.reduce(
+    (sum, item) => sum + (parseFloat(item.quantity) || 0),
+    0,
+  );
 
   const printBill = async (
     cartItems,
@@ -549,7 +553,6 @@ const CashierDashboard = () => {
                   setSearchTerm('');
                   searchRef.current?.blur();
                   setActiveSection('CART');
-                  setSelectedCartIndex(0);
                 }
               }}
               renderOption={(props, option) => {
@@ -600,13 +603,6 @@ const CashierDashboard = () => {
                   placeholder="Search product by name or scan barcode"
                   variant="outlined"
                   inputRef={searchRef}
-                  onFocus={() => {
-                    // Scroll search input into view when focused
-                    searchRef.current?.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'center',
-                    });
-                  }}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (
@@ -761,7 +757,12 @@ const CashierDashboard = () => {
                         >
                           <IconButton
                             size="small"
-                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? -0.5 : -1)}
+                            onClick={() =>
+                              updateQuantity(
+                                item.id,
+                                item.sale_type === 'WEIGHT' ? -0.5 : -1,
+                              )
+                            }
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <RemoveIcon fontSize="small" />
@@ -790,15 +791,19 @@ const CashierDashboard = () => {
                                 // Snap to minimum
                                 setCart((prev) =>
                                   prev.map((ci) =>
-                                    ci.id === item.id ? { ...ci, quantity: minQty } : ci
-                                  )
+                                    ci.id === item.id
+                                      ? { ...ci, quantity: minQty }
+                                      : ci,
+                                  ),
                                 );
                               } else {
                                 // Commit the parsed number (removes trailing dots)
                                 setCart((prev) =>
                                   prev.map((ci) =>
-                                    ci.id === item.id ? { ...ci, quantity: parsed } : ci
-                                  )
+                                    ci.id === item.id
+                                      ? { ...ci, quantity: parsed }
+                                      : ci,
+                                  ),
                                 );
                               }
                             }}
@@ -810,8 +815,14 @@ const CashierDashboard = () => {
                                 fontWeight: 700,
                                 fontSize: '0.875rem',
                               },
-                              inputMode: item.sale_type === 'WEIGHT' ? 'decimal' : 'numeric',
-                              pattern: item.sale_type === 'WEIGHT' ? '[0-9]*\.?[0-9]*' : '[0-9]*',
+                              inputMode:
+                                item.sale_type === 'WEIGHT'
+                                  ? 'decimal'
+                                  : 'numeric',
+                              pattern:
+                                item.sale_type === 'WEIGHT'
+                                  ? '[0-9]*\.?[0-9]*'
+                                  : '[0-9]*',
                             }}
                             variant="outlined"
                             sx={{
@@ -830,7 +841,12 @@ const CashierDashboard = () => {
                           />
                           <IconButton
                             size="small"
-                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? 0.5 : 1)}
+                            onClick={() =>
+                              updateQuantity(
+                                item.id,
+                                item.sale_type === 'WEIGHT' ? 0.5 : 1,
+                              )
+                            }
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <AddIcon fontSize="small" />

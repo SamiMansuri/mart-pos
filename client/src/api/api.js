@@ -54,8 +54,12 @@ export const billsApi = {
     apiFetch(`/bills/${id}`, {
       method: 'DELETE',
     }),
-  getBillsHistory: (page = 1, limit = 10) =>
-    apiFetch(`/bills/bill-history?page=${page}&limit=${limit}`),
+  getBillsHistory: (page = 1, limit = 10, search = '', date = '') => {
+    let url = `/bills/bill-history?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (date) url += `&date=${date}`;
+    return apiFetch(url);
+  },
   create: (billData) =>
     apiFetch('/bills', {
       method: 'POST',
@@ -79,6 +83,11 @@ export const billsApi = {
       url += `business_date=${params.business_date}&invoice_number=${params.invoice_number}`;
     return apiFetch(url);
   },
+  editBill: (id, billData) =>
+    apiFetch(`/bills/${id}/edit`, {
+      method: 'PATCH',
+      body: JSON.stringify(billData),
+    }),
 };
 
 export const productsApi = {
@@ -138,4 +147,5 @@ export const usersApi = {
 export const reportsApi = {
   getStats: (startDate, endDate) =>
     apiFetch(`/reports?startDate=${startDate}&endDate=${endDate}`),
+  getCashierReport: (date) => apiFetch(`/reports/cashier?date=${date}`),
 };

@@ -32,7 +32,7 @@ import {
   Lock as LockIcon,
   MoreVert as MoreIcon,
 } from '@mui/icons-material';
-import { isAdmin, getUserInfo } from '../utils/auth.utils';
+import { isAdmin, isCashier, getUserInfo } from '../utils/auth.utils';
 import { authApi } from '../api/api';
 import { useEffect } from 'react';
 
@@ -72,12 +72,14 @@ const Layout = () => {
     if (location.pathname.startsWith('/admin/products'))
       return '/admin/products';
     if (location.pathname.startsWith('/admin')) return '/admin';
+    if (location.pathname === '/cashier/report') return '/cashier/report';
     if (location.pathname.startsWith('/cashier')) return '/cashier';
     if (location.pathname.startsWith('/history')) return '/history';
     return false;
   };
 
   const showAdminTab = isAdmin();
+  const isCashierUser = isCashier();
 
   const menuItems = [
     ...(showAdminTab
@@ -92,7 +94,17 @@ const Layout = () => {
           { text: 'Employees', icon: <PeopleIcon />, path: '/admin/users' },
         ]
       : []),
+    ...(isCashierUser
+      ? [
+          {
+            text: 'Inventory',
+            icon: <InventoryIcon />,
+            path: '/admin/products',
+          },
+        ]
+      : []),
     { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
+    { text: 'Cashier Report', icon: <ReportsIcon />, path: '/cashier/report' },
     { text: 'History', icon: <HistoryIcon />, path: '/history' },
   ];
 

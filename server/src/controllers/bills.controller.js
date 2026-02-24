@@ -13,7 +13,13 @@ import {
 import { BILL_QUERIES, BATCH_QUERIES, STOCK_QUERIES } from "../db/queries.js";
 
 export const createBill = asyncHandler(async (req, res) => {
-  const { items, payment_method, idempotency_key, business_date, round_adjustment } = req.body;
+  const {
+    items,
+    payment_method,
+    idempotency_key,
+    business_date,
+    round_adjustment,
+  } = req.body;
   const { user_id } = req.user;
 
   if (!idempotency_key) {
@@ -75,7 +81,7 @@ export const createBill = asyncHandler(async (req, res) => {
 
     const billNumber = `BILL-${Date.now()}`;
 
-    const totalAmount = subTotal + round_adjustment;
+    const totalAmount = subTotal - round_adjustment;
 
     const billRes = await client.query(BILL_QUERIES.CREATE, [
       billNumber,
@@ -721,16 +727,30 @@ export const settleDay = asyncHandler(async (req, res) => {
 
 export const getBillsHistory = asyncHandler(async (req, res) => {
   const { user_id } = req.user;
+  const { search, date } = req.query;
 
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   const offset = (page - 1) * limit;
 
   const result = await withTransaction(async (client) => {
-    // Get total count for the user
+    let whereClause = "WHERE created_by = $1";
+    let params = [user_id];
+
+    if (search) {
+      params.push(`%${search}%`);
+      whereClause += ` AND bill_number ILIKE $${params.length}`;
+    }
+
+    if (date) {
+      params.push(date);
+      whereClause += ` AND created_at::date = $${params.length}`;
+    }
+
+    // Get total count for the user with filters
     const countRes = await client.query(
-      "SELECT COUNT(*) FROM bills WHERE created_by = $1",
-      [user_id],
+      `SELECT COUNT(*) FROM bills ${whereClause}`,
+      params,
     );
     const total = parseInt(countRes.rows[0].count);
     const totalPages = Math.ceil(total / limit);
@@ -739,11 +759,11 @@ export const getBillsHistory = asyncHandler(async (req, res) => {
       `
       SELECT *
       FROM bills
-      WHERE created_by = $1
+      ${whereClause}
       ORDER BY created_at DESC
-      LIMIT $2 OFFSET $3
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `,
-      [user_id, limit, offset],
+      [...params, limit, offset],
     );
 
     return {
@@ -922,6 +942,59 @@ export const getBillDetailsForAdmin = asyncHandler(async (req, res) => {
     getSuccessResponse({
       data: result,
       message: "Detailed bill info fetched successfully",
+      status: 200,
+    }),
+  );
+});
+
+export const editBill = asyncHandler(async (req, res) => {
+  const { round_adjustment } = req.body;
+  const { bill_id } = req.params;
+
+  if (!round_adjustment)
+    throw createHttpError(400, "Round adjustment is required");
+
+  const result = await withTransaction(async (client) => {
+    const billRes = await client.query(`SELECT * FROM bills WHERE id = $1`, [
+      bill_id,
+    ]);
+
+    if (!billRes.rows.length) throw createHttpError(404, "Bill not found");
+    const bill = billRes.rows[0];
+
+    const newTotalAmount = Number(bill.sub_total) - Number(round_adjustment);
+
+    await client.query(
+      `UPDATE bills SET round_adjustment = $1, total_amount = $2 WHERE id = $3`,
+      [round_adjustment, newTotalAmount, bill_id],
+    );
+
+    await logBillEvent({
+      client,
+      bill_id: billRes.rows[0].id,
+      eventType: "UPDATED",
+      performedBy: req.user.user_id,
+      metadata: {
+        old_round_adjustment: bill.round_adjustment,
+        old_total_amount: bill.total_amount,
+        new_round_adjustment: round_adjustment,
+        new_total_amount: newTotalAmount,
+      },
+    });
+
+    return {
+      bill: {
+        ...bill,
+        round_adjustment,
+        total_amount: newTotalAmount,
+      },
+    };
+  });
+
+  res.json(
+    getSuccessResponse({
+      data: result,
+      message: "Bill updated successfully",
       status: 200,
     }),
   );
