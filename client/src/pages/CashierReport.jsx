@@ -186,6 +186,7 @@ const CashierReport = () => {
                         <TableHead sx={{ bgcolor: 'action.hover' }}>
                             <TableRow>
                                 <TableCell sx={{ fontWeight: 700 }}>BILL #</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>INV #</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>TIME</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>CASHIER</TableCell>
                                 <TableCell align="right" sx={{ fontWeight: 700 }}>AMOUNT</TableCell>
@@ -203,6 +204,7 @@ const CashierReport = () => {
                                         sx={{ cursor: 'pointer' }}
                                     >
                                         <TableCell sx={{ fontWeight: 600 }}>{bill.bill_number}</TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }}>#{bill.invoice_number}</TableCell>
                                         <TableCell>
                                             {new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </TableCell>
