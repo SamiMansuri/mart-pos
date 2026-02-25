@@ -98,9 +98,7 @@ const CashierDashboard = () => {
 
   const addToCart = useCallback((product) => {
     setCart((prevCart) => {
-      const existingItemIndex = prevCart.findIndex(
-        (item) => item.id === product.id,
-      );
+      const existingItemIndex = prevCart.findIndex((item) => item.id === product.id);
 
       if (existingItemIndex > -1) {
         const newCart = [...prevCart];
@@ -331,13 +329,11 @@ const CashierDashboard = () => {
               } else {
                 // For UNIT: integers only
                 newQty = deltaOrQty === '' ? '' : parseInt(deltaOrQty, 10);
-                if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1))
-                  return item;
+                if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1)) return item;
               }
             } else {
               // +/- buttons: always numeric
-              const current =
-                parseFloat(item.quantity) || (isWeight ? 0.001 : 1);
+              const current = parseFloat(item.quantity) || (isWeight ? 0.001 : 1);
               newQty = Math.max(isWeight ? 0.001 : 1, current + deltaOrQty);
               if (isWeight) {
                 // Round to 3 decimal places to avoid floating point drift
@@ -360,15 +356,13 @@ const CashierDashboard = () => {
 
   const total = subTotal - Number(roundAdjust || 0);
 
-  const totalItems = cart.reduce(
-    (sum, item) => sum + (parseFloat(item.quantity) || 0),
-    0,
-  );
+  const totalItems = cart.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
 
   const printBill = async (
     cartItems,
     totalAmount,
     billNumber,
+    invoiceNumber,
     paymentMethod,
     date,
   ) => {
@@ -376,6 +370,7 @@ const CashierDashboard = () => {
       const billData = {
         bill: {
           bill_number: billNumber,
+          invoice_number: invoiceNumber,
           date: date,
           payment_method: paymentMethod,
           items: cartItems.map((item) => ({
@@ -435,6 +430,7 @@ const CashierDashboard = () => {
           currentCart,
           currentTotal,
           response.bill_number,
+          response.invoice_number,
           paymentMethod,
           new Intl.DateTimeFormat('en-IN', {
             timeZone: 'Asia/Kolkata',
@@ -757,12 +753,7 @@ const CashierDashboard = () => {
                         >
                           <IconButton
                             size="small"
-                            onClick={() =>
-                              updateQuantity(
-                                item.id,
-                                item.sale_type === 'WEIGHT' ? -0.5 : -1,
-                              )
-                            }
+                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? -0.5 : -1)}
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <RemoveIcon fontSize="small" />
@@ -791,19 +782,15 @@ const CashierDashboard = () => {
                                 // Snap to minimum
                                 setCart((prev) =>
                                   prev.map((ci) =>
-                                    ci.id === item.id
-                                      ? { ...ci, quantity: minQty }
-                                      : ci,
-                                  ),
+                                    ci.id === item.id ? { ...ci, quantity: minQty } : ci
+                                  )
                                 );
                               } else {
                                 // Commit the parsed number (removes trailing dots)
                                 setCart((prev) =>
                                   prev.map((ci) =>
-                                    ci.id === item.id
-                                      ? { ...ci, quantity: parsed }
-                                      : ci,
-                                  ),
+                                    ci.id === item.id ? { ...ci, quantity: parsed } : ci
+                                  )
                                 );
                               }
                             }}
@@ -815,14 +802,8 @@ const CashierDashboard = () => {
                                 fontWeight: 700,
                                 fontSize: '0.875rem',
                               },
-                              inputMode:
-                                item.sale_type === 'WEIGHT'
-                                  ? 'decimal'
-                                  : 'numeric',
-                              pattern:
-                                item.sale_type === 'WEIGHT'
-                                  ? '[0-9]*\.?[0-9]*'
-                                  : '[0-9]*',
+                              inputMode: item.sale_type === 'WEIGHT' ? 'decimal' : 'numeric',
+                              pattern: item.sale_type === 'WEIGHT' ? '[0-9]*\.?[0-9]*' : '[0-9]*',
                             }}
                             variant="outlined"
                             sx={{
@@ -841,12 +822,7 @@ const CashierDashboard = () => {
                           />
                           <IconButton
                             size="small"
-                            onClick={() =>
-                              updateQuantity(
-                                item.id,
-                                item.sale_type === 'WEIGHT' ? 0.5 : 1,
-                              )
-                            }
+                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? 0.5 : 1)}
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <AddIcon fontSize="small" />
