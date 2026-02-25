@@ -225,6 +225,7 @@ export const getBillById = asyncHandler(async (req, res) => {
     total_amount: rows[0].total_amount,
     payment_method: rows[0].payment_method,
     created_at: rows[0].created_at,
+    invoice_number: rows[0].invoice_number,
     items: rows.map((row) => ({
       item_id: row.item_id,
       product_id: row.product_id,
@@ -734,8 +735,8 @@ export const getBillsHistory = asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit;
 
   const result = await withTransaction(async (client) => {
-    let whereClause = "WHERE created_by = $1";
-    let params = [user_id];
+    let whereClause = "WHERE 1=1";
+    let params = [];
 
     if (search) {
       params.push(`%${search}%`);
@@ -747,7 +748,7 @@ export const getBillsHistory = asyncHandler(async (req, res) => {
       whereClause += ` AND created_at::date = $${params.length}`;
     }
 
-    // Get total count for the user with filters
+    // Get total count with filters
     const countRes = await client.query(
       `SELECT COUNT(*) FROM bills ${whereClause}`,
       params,
