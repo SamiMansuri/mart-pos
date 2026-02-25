@@ -53,53 +53,50 @@ const ReturnBill = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const location = useLocation();
 
-  const fetchBill = useCallback(
-    async (forcedParams = null) => {
-      setLoading(true);
-      setError(null);
-      setBill(null);
-      setReturnItems({});
-      try {
-        let params = {};
-        if (forcedParams) {
-          params = forcedParams;
-        } else if (searchType === 'bill_number') {
-          params.bill_number = searchValue.trim();
-        } else {
-          params.business_date = businessDate;
-          params.invoice_number = invoiceNumber;
-        }
-
-        const searchRes = await billsApi.search(params);
-        const billDetails = await billsApi.getById(searchRes.bill_id);
-
-        // Group items by product_id for display
-        const groupedItems = [];
-        const itemMap = new Map();
-
-        billDetails.items.forEach((item) => {
-          if (itemMap.has(item.product_id)) {
-            const existing = itemMap.get(item.product_id);
-            existing.quantity =
-              Number(existing.quantity) + Number(item.quantity);
-            existing.line_total =
-              Number(existing.line_total) + Number(item.line_total);
-          } else {
-            const itemCopy = { ...item };
-            itemMap.set(item.product_id, itemCopy);
-            groupedItems.push(itemCopy);
-          }
-        });
-
-        setBill({ ...billDetails, items: groupedItems });
-      } catch (err) {
-        setError(err.message || 'Bill not found');
-      } finally {
-        setLoading(false);
+  const fetchBill = useCallback(async (forcedParams = null) => {
+    setLoading(true);
+    setError(null);
+    setBill(null);
+    setReturnItems({});
+    try {
+      let params = {};
+      // If forcedParams is provided and is NOT a React/DOM event object
+      if (forcedParams && typeof forcedParams === 'object' && !forcedParams.target) {
+        params = forcedParams;
+      } else if (searchType === 'bill_number') {
+        params.bill_number = searchValue.trim();
+      } else {
+        params.business_date = businessDate;
+        params.invoice_number = invoiceNumber;
       }
-    },
-    [searchType, searchValue, businessDate, invoiceNumber],
-  );
+
+      const searchRes = await billsApi.search(params);
+      const billDetails = await billsApi.getById(searchRes.bill_id);
+
+      // Group items by product_id for display
+      const groupedItems = [];
+      const itemMap = new Map();
+
+      billDetails.items.forEach((item) => {
+        if (itemMap.has(item.product_id)) {
+          const existing = itemMap.get(item.product_id);
+          existing.quantity = Number(existing.quantity) + Number(item.quantity);
+          existing.line_total =
+            Number(existing.line_total) + Number(item.line_total);
+        } else {
+          const itemCopy = { ...item };
+          itemMap.set(item.product_id, itemCopy);
+          groupedItems.push(itemCopy);
+        }
+      });
+
+      setBill({ ...billDetails, items: groupedItems });
+    } catch (err) {
+      setError(err.message || 'Bill not found');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchType, searchValue, businessDate, invoiceNumber]);
 
   useEffect(() => {
     if (location.state?.bill_number) {
@@ -142,9 +139,9 @@ const ReturnBill = () => {
 
   const totalReturnAmount = bill
     ? bill.items.reduce((sum, item) => {
-        const qty = returnItems[item.product_id] || 0;
-        return sum + Number(item.price) * qty;
-      }, 0)
+      const qty = returnItems[item.product_id] || 0;
+      return sum + Number(item.price) * qty;
+    }, 0)
     : 0;
 
   const handleConfirmReturn = async () => {
@@ -256,7 +253,7 @@ const ReturnBill = () => {
               fullWidth
               variant="contained"
               startIcon={<SearchIcon />}
-              onClick={fetchBill}
+              onClick={() => fetchBill()}
               disabled={loading}
             >
               Find Bill
@@ -290,6 +287,9 @@ const ReturnBill = () => {
                 <Box sx={{ textAlign: 'right' }}>
                   <Typography variant="body2" color="text.secondary">
                     Bill #: <strong>{bill.bill_number}</strong>
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Inv #: <strong>#{bill.invoice_number}</strong>
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Date: {new Date(bill.created_at).toLocaleString()}
@@ -338,37 +338,17 @@ const ReturnBill = () => {
                             </IconButton>
                             <TextField
                               size="small"
-                              value={
-                                returnItems[item.product_id] !== undefined
-                                  ? returnItems[item.product_id]
-                                  : 0
-                              }
-                              onChange={(e) =>
-                                handleManualQtyChange(
-                                  item.product_id,
-                                  e.target.value,
-                                  item.quantity,
-                                  item.sale_type,
-                                )
-                              }
+                              value={returnItems[item.product_id] !== undefined ? returnItems[item.product_id] : 0}
+                              onChange={(e) => handleManualQtyChange(item.product_id, e.target.value, item.quantity, item.sale_type)}
                               onBlur={(e) => {
                                 const val = parseFloat(e.target.value);
                                 if (isNaN(val) || val < 0) {
-                                  setReturnItems((prev) => ({
-                                    ...prev,
-                                    [item.product_id]: 0,
-                                  }));
+                                  setReturnItems(prev => ({ ...prev, [item.product_id]: 0 }));
                                 } else if (val > item.quantity) {
-                                  setReturnItems((prev) => ({
-                                    ...prev,
-                                    [item.product_id]: item.quantity,
-                                  }));
+                                  setReturnItems(prev => ({ ...prev, [item.product_id]: item.quantity }));
                                 } else {
                                   // Commit the parsed number (removes trailing dots)
-                                  setReturnItems((prev) => ({
-                                    ...prev,
-                                    [item.product_id]: val,
-                                  }));
+                                  setReturnItems(prev => ({ ...prev, [item.product_id]: val }));
                                 }
                               }}
                               inputProps={{
@@ -378,10 +358,7 @@ const ReturnBill = () => {
                                   fontWeight: 600,
                                   padding: '4px 0',
                                 },
-                                inputMode:
-                                  item.sale_type === 'WEIGHT'
-                                    ? 'decimal'
-                                    : 'numeric',
+                                inputMode: item.sale_type === 'WEIGHT' ? 'decimal' : 'numeric',
                               }}
                               sx={{
                                 '& .MuiOutlinedInput-input': {
