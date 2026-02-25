@@ -77,11 +77,8 @@ export const billsApi = {
       body: JSON.stringify(returnData),
     }),
   search: (params) => {
-    let url = '/bills/search?';
-    if (params.bill_number) url += `bill_number=${params.bill_number}`;
-    else if (params.business_date && params.invoice_number)
-      url += `business_date=${params.business_date}&invoice_number=${params.invoice_number}`;
-    return apiFetch(url);
+    const searchParams = new URLSearchParams(params);
+    return apiFetch(`/bills/search?${searchParams.toString()}`);
   },
   editBill: (id, billData) =>
     apiFetch(`/bills/${id}/edit`, {
