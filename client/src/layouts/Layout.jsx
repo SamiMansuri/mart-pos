@@ -32,7 +32,7 @@ import {
   Lock as LockIcon,
   MoreVert as MoreIcon,
 } from '@mui/icons-material';
-import { isAdmin, isCashier, getUserInfo } from '../utils/auth.utils';
+import { isAdmin, getUserInfo } from '../utils/auth.utils';
 import { authApi } from '../api/api';
 import { useEffect } from 'react';
 
@@ -79,29 +79,19 @@ const Layout = () => {
   };
 
   const showAdminTab = isAdmin();
-  const isCashierUser = isCashier();
 
   const menuItems = [
     ...(showAdminTab
       ? [
-          { text: 'Dashboard', icon: <AdminIcon />, path: '/admin' },
-          {
-            text: 'Inventory',
-            icon: <InventoryIcon />,
-            path: '/admin/products',
-          },
-          { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
-          { text: 'Employees', icon: <PeopleIcon />, path: '/admin/users' },
-        ]
-      : []),
-    ...(isCashierUser
-      ? [
-          {
-            text: 'Inventory',
-            icon: <InventoryIcon />,
-            path: '/admin/products',
-          },
-        ]
+        { text: 'Dashboard', icon: <AdminIcon />, path: '/admin' },
+        {
+          text: 'Inventory',
+          icon: <InventoryIcon />,
+          path: '/admin/products',
+        },
+        { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
+        { text: 'Employees', icon: <PeopleIcon />, path: '/admin/users' },
+      ]
       : []),
     { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
     { text: 'Cashier Report', icon: <ReportsIcon />, path: '/cashier/report' },
@@ -279,7 +269,11 @@ const Layout = () => {
 
           {/* Account Menu - Desktop only */}
           <Box sx={{ display: { xs: 'none', lg: 'flex' } }}>
-            <IconButton onClick={handleMenuOpen} size="small" sx={{ ml: 2 }}>
+            <IconButton
+              onClick={handleMenuOpen}
+              size="small"
+              sx={{ ml: 2 }}
+            >
               <MoreIcon />
             </IconButton>
             <Menu
@@ -291,7 +285,7 @@ const Layout = () => {
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
               PaperProps={{
                 elevation: 3,
-                sx: { mt: 1, minWidth: 200 },
+                sx: { mt: 1, minWidth: 200 }
               }}
             >
               <Box sx={{ px: 2, py: 1.5 }}>
