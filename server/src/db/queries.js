@@ -161,6 +161,7 @@ export const BILL_QUERIES = {
        b.total_amount,
        b.payment_method,
        b.created_at,
+       b.invoice_number,
        bi.id AS item_id,
        bi.quantity,
        bi.price,

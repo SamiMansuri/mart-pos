@@ -18,9 +18,11 @@ import {
   Search as SearchIcon,
 } from '@mui/icons-material';
 import { productsApi, stockApi } from '../api/api';
+import { isAdmin as checkAdmin } from '../utils/auth.utils';
 
 const StockEntry = () => {
   const navigate = useNavigate();
+  const isAdminUser = checkAdmin();
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' });
@@ -92,7 +94,10 @@ const StockEntry = () => {
         ...formData,
         cost_price: parseFloat(formData.cost_price) || 0,
         mrp: parseFloat(formData.mrp) || 0,
-        quantity: selectedProduct.sale_type === 'WEIGHT' ? parseFloat(formData.quantity) : parseInt(formData.quantity, 10),
+        quantity:
+          selectedProduct.sale_type === 'WEIGHT'
+            ? parseFloat(formData.quantity)
+            : parseInt(formData.quantity, 10),
       });
 
       setStatus({
@@ -253,26 +258,28 @@ const StockEntry = () => {
                 required
                 inputProps={{
                   min: selectedProduct?.sale_type === 'WEIGHT' ? '0.001' : '1',
-                  step: selectedProduct?.sale_type === 'WEIGHT' ? '0.001' : '1'
+                  step: selectedProduct?.sale_type === 'WEIGHT' ? '0.001' : '1',
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Cost Price (Optional)"
-                name="cost_price"
-                type="number"
-                value={formData.cost_price}
-                onChange={handleChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">₹</InputAdornment>
-                  ),
-                }}
-                inputProps={{ step: '0.01', min: '0' }}
-              />
-            </Grid>
+            {isAdminUser && (
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Cost Price (Optional)"
+                  name="cost_price"
+                  type="number"
+                  value={formData.cost_price}
+                  onChange={handleChange}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">₹</InputAdornment>
+                    ),
+                  }}
+                  inputProps={{ step: '0.01', min: '0' }}
+                />
+              </Grid>
+            )}
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth

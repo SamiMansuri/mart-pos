@@ -54,8 +54,12 @@ export const billsApi = {
     apiFetch(`/bills/${id}`, {
       method: 'DELETE',
     }),
-  getBillsHistory: (page = 1, limit = 10) =>
-    apiFetch(`/bills/bill-history?page=${page}&limit=${limit}`),
+  getBillsHistory: (page = 1, limit = 10, search = '', date = '') => {
+    let url = `/bills/bill-history?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (date) url += `&date=${date}`;
+    return apiFetch(url);
+  },
   create: (billData) =>
     apiFetch('/bills', {
       method: 'POST',
@@ -73,12 +77,14 @@ export const billsApi = {
       body: JSON.stringify(returnData),
     }),
   search: (params) => {
-    let url = '/bills/search?';
-    if (params.bill_number) url += `bill_number=${params.bill_number}`;
-    else if (params.business_date && params.invoice_number)
-      url += `business_date=${params.business_date}&invoice_number=${params.invoice_number}`;
-    return apiFetch(url);
+    const searchParams = new URLSearchParams(params);
+    return apiFetch(`/bills/search?${searchParams.toString()}`);
   },
+  editBill: (id, billData) =>
+    apiFetch(`/bills/${id}/edit`, {
+      method: 'PATCH',
+      body: JSON.stringify(billData),
+    }),
 };
 
 export const productsApi = {
@@ -119,6 +125,11 @@ export const authApi = {
     apiFetch('/auth/logout', {
       method: 'POST',
     }),
+  changePassword: (passwords) =>
+    apiFetch('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(passwords),
+    }),
 };
 
 export const usersApi = {
@@ -133,4 +144,5 @@ export const usersApi = {
 export const reportsApi = {
   getStats: (startDate, endDate) =>
     apiFetch(`/reports?startDate=${startDate}&endDate=${endDate}`),
+  getCashierReport: (date) => apiFetch(`/reports/cashier?date=${date}`),
 };

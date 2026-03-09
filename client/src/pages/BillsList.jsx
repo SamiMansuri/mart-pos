@@ -19,6 +19,11 @@ import {
   Menu,
   MenuItem,
   Pagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 import {
   MoreVert as MoreIcon,
@@ -36,6 +41,9 @@ const BillsList = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedBill, setSelectedBill] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editValue, setEditValue] = useState(0);
+  const [saving, setSaving] = useState(false);
   const limit = 10;
 
   useEffect(() => {
@@ -80,9 +88,37 @@ const BillsList = () => {
     setSelectedBill(null);
   };
 
+  const handleEditOpen = () => {
+    if (selectedBill) {
+      setEditValue(selectedBill.round_adjustment || 0);
+      setEditDialogOpen(true);
+      handleMenuClose();
+    }
+  };
+
+  const handleEditClose = () => {
+    setEditDialogOpen(false);
+    setEditValue(0);
+  };
+
+  const handleEditSave = async () => {
+    try {
+      setSaving(true);
+      await billsApi.editBill(selectedBill.id, {
+        round_adjustment: parseFloat(editValue),
+      });
+      setEditDialogOpen(false);
+      fetchBills();
+    } catch (err) {
+      alert(err.message || 'Failed to update bill');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleVoid = async () => {
     if (!selectedBill) return;
-    if (!window.confirm(`Void transaction #${selectedBill.id}?`)) {
+    if (!window.confirm(`Void transaction ${selectedBill.bill_number}?`)) {
       handleMenuClose();
       return;
     }
@@ -177,8 +213,10 @@ const BillsList = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>ID</TableCell>
+              <TableCell>Bill Number</TableCell>
               <TableCell>Date</TableCell>
+              <TableCell align="right">Subtotal</TableCell>
+              <TableCell align="right">Round Adjust</TableCell>
               <TableCell align="right">Amount</TableCell>
               <TableCell align="center">Status</TableCell>
               <TableCell align="right">Actions</TableCell>
@@ -198,7 +236,7 @@ const BillsList = () => {
                 <TableRow key={bill.id} hover>
                   <TableCell>
                     <Typography variant="body2" fontWeight={600}>
-                      #{bill.id}
+                      {bill.bill_number}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -214,6 +252,21 @@ const BillsList = () => {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2">
+                      ₹{parseFloat(bill.sub_total || 0).toFixed(2)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography
+                      variant="body2"
+                      color={
+                        bill.round_adjustment < 0 ? 'error' : 'text.primary'
+                      }
+                    >
+                      ₹{parseFloat(bill.round_adjustment || 0).toFixed(2)}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -262,12 +315,31 @@ const BillsList = () => {
       >
         <MenuItem
           onClick={() => {
+            navigate('/cashier/return', {
+              state: { bill_number: selectedBill.bill_number },
+            });
+            handleMenuClose();
+          }}
+        >
+          Return Sale
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
             navigate(`/admin/bills/${selectedBill.id}`);
             handleMenuClose();
           }}
         >
-          View Details
+          View Full Details
         </MenuItem>
+        <MenuItem
+          onClick={() => {
+            navigate(`/bill-view/${selectedBill.id}`);
+            handleMenuClose();
+          }}
+        >
+          View Receipt
+        </MenuItem>
+        <MenuItem onClick={handleEditOpen}>Edit Bill</MenuItem>
         <MenuItem onClick={handleMenuClose}>Print</MenuItem>
         {selectedBill && !selectedBill.is_void && (
           <MenuItem onClick={handleVoid} sx={{ color: 'error.main' }}>
@@ -275,6 +347,50 @@ const BillsList = () => {
           </MenuItem>
         )}
       </Menu>
+
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleEditClose}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Edit Bill - {selectedBill?.bill_number}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Subtotal: ₹{parseFloat(selectedBill?.sub_total || 0).toFixed(2)}
+            </Typography>
+            <TextField
+              fullWidth
+              autoFocus
+              label="Round Adjustment"
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              sx={{ mt: 2 }}
+            />
+            <Typography variant="h6" sx={{ mt: 2, fontWeight: 700 }}>
+              New Total: ₹
+              {(
+                Number(selectedBill?.sub_total || 0) - Number(editValue || 0)
+              ).toFixed(2)}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleEditSave}
+            variant="contained"
+            disabled={saving}
+          >
+            {saving ? <CircularProgress size={24} /> : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -16,7 +16,9 @@ import ReturnBill from './pages/ReturnBill';
 import BillView from './pages/BillView';
 import AdminBillDetails from './pages/AdminBillDetails';
 import Reports from './pages/Reports';
+import CashierReport from './pages/CashierReport';
 import StockEntry from './pages/StockEntry';
+import ChangePassword from './pages/ChangePassword';
 import { getUserInfo, isTokenExpired } from './utils/auth.utils';
 
 // Guard for authenticated sessions
@@ -91,6 +93,14 @@ function App() {
             }
           />
           <Route
+            path="cashier/report"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <CashierReport />
+              </RoleGuard>
+            }
+          />
+          <Route
             path="cashier/return"
             element={
               <RoleGuard allowedRoles={['cashier', 'admin']}>
@@ -135,7 +145,7 @@ function App() {
           <Route
             path="admin/products/add"
             element={
-              <RoleGuard allowedRoles={['admin']}>
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <AddProduct />
               </RoleGuard>
             }
@@ -143,7 +153,7 @@ function App() {
           <Route
             path="admin/products"
             element={
-              <RoleGuard allowedRoles={['admin']}>
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <ProductsList />
               </RoleGuard>
             }
@@ -151,7 +161,7 @@ function App() {
           <Route
             path="admin/products/edit/:id"
             element={
-              <RoleGuard allowedRoles={['admin']}>
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <UpdateProduct />
               </RoleGuard>
             }
@@ -159,7 +169,7 @@ function App() {
           <Route
             path="admin/stock"
             element={
-              <RoleGuard allowedRoles={['admin']}>
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <StockEntry />
               </RoleGuard>
             }
@@ -201,6 +211,15 @@ function App() {
             element={
               <RoleGuard allowedRoles={['admin']}>
                 <Reports />
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="change-password"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <ChangePassword />
               </RoleGuard>
             }
           />

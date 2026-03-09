@@ -98,9 +98,7 @@ const CashierDashboard = () => {
 
   const addToCart = useCallback((product) => {
     setCart((prevCart) => {
-      const existingItemIndex = prevCart.findIndex(
-        (item) => item.id === product.id,
-      );
+      const existingItemIndex = prevCart.findIndex((item) => item.id === product.id);
 
       if (existingItemIndex > -1) {
         const newCart = [...prevCart];
@@ -108,14 +106,14 @@ const CashierDashboard = () => {
           ...newCart[existingItemIndex],
           quantity: newCart[existingItemIndex].quantity + 1,
         };
+        setSelectedCartIndex(existingItemIndex);
         return newCart;
       } else {
         const newCart = [...prevCart, { ...product, quantity: 1 }];
+        setSelectedCartIndex(newCart.length - 1);
         return newCart;
       }
     });
-    // Always select the first item
-    setSelectedCartIndex(0);
   }, []);
 
   const fetchProducts = useCallback(async (term) => {
@@ -351,13 +349,12 @@ const CashierDashboard = () => {
     [],
   );
 
-
   const subTotal = cart.reduce(
     (sum, item) => sum + item.selling_price * (parseFloat(item.quantity) || 0),
     0,
   );
 
-  const total = subTotal + Number(roundAdjust || 0);
+  const total = subTotal - Number(roundAdjust || 0);
 
   const totalItems = cart.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
 
@@ -365,6 +362,7 @@ const CashierDashboard = () => {
     cartItems,
     totalAmount,
     billNumber,
+    invoiceNumber,
     paymentMethod,
     date,
   ) => {
@@ -372,6 +370,7 @@ const CashierDashboard = () => {
       const billData = {
         bill: {
           bill_number: billNumber,
+          invoice_number: invoiceNumber,
           date: date,
           payment_method: paymentMethod,
           items: cartItems.map((item) => ({
@@ -431,6 +430,7 @@ const CashierDashboard = () => {
           currentCart,
           currentTotal,
           response.bill_number,
+          response.invoice_number,
           paymentMethod,
           new Intl.DateTimeFormat('en-IN', {
             timeZone: 'Asia/Kolkata',
@@ -549,7 +549,6 @@ const CashierDashboard = () => {
                   setSearchTerm('');
                   searchRef.current?.blur();
                   setActiveSection('CART');
-                  setSelectedCartIndex(0);
                 }
               }}
               renderOption={(props, option) => {
@@ -600,13 +599,6 @@ const CashierDashboard = () => {
                   placeholder="Search product by name or scan barcode"
                   variant="outlined"
                   inputRef={searchRef}
-                  onFocus={() => {
-                    // Scroll search input into view when focused
-                    searchRef.current?.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'center',
-                    });
-                  }}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (

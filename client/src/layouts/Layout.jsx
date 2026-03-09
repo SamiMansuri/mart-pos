@@ -15,6 +15,9 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  Menu,
+  MenuItem,
+  Avatar,
 } from '@mui/material';
 import {
   Store as StoreIcon,
@@ -26,8 +29,10 @@ import {
   People as PeopleIcon,
   Menu as MenuIcon,
   BarChart as ReportsIcon,
+  Lock as LockIcon,
+  MoreVert as MoreIcon,
 } from '@mui/icons-material';
-import { isAdmin } from '../utils/auth.utils';
+import { isAdmin, getUserInfo } from '../utils/auth.utils';
 import { authApi } from '../api/api';
 import { useEffect } from 'react';
 
@@ -35,9 +40,19 @@ const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const user = getUserInfo();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
   };
 
   const handleLogout = async () => {
@@ -57,6 +72,7 @@ const Layout = () => {
     if (location.pathname.startsWith('/admin/products'))
       return '/admin/products';
     if (location.pathname.startsWith('/admin')) return '/admin';
+    if (location.pathname === '/cashier/report') return '/cashier/report';
     if (location.pathname.startsWith('/cashier')) return '/cashier';
     if (location.pathname.startsWith('/history')) return '/history';
     return false;
@@ -67,17 +83,18 @@ const Layout = () => {
   const menuItems = [
     ...(showAdminTab
       ? [
-          { text: 'Dashboard', icon: <AdminIcon />, path: '/admin' },
-          {
-            text: 'Inventory',
-            icon: <InventoryIcon />,
-            path: '/admin/products',
-          },
-          { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
-          { text: 'Employees', icon: <PeopleIcon />, path: '/admin/users' },
-        ]
+        { text: 'Dashboard', icon: <AdminIcon />, path: '/admin' },
+        {
+          text: 'Inventory',
+          icon: <InventoryIcon />,
+          path: '/admin/products',
+        },
+        { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
+        { text: 'Employees', icon: <PeopleIcon />, path: '/admin/users' },
+      ]
       : []),
     { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
+    { text: 'Cashier Report', icon: <ReportsIcon />, path: '/cashier/report' },
     { text: 'History', icon: <HistoryIcon />, path: '/history' },
   ];
 
@@ -163,6 +180,18 @@ const Layout = () => {
       <Divider />
       <List>
         <ListItem disablePadding>
+          <ListItemButton
+            component={Link}
+            to="/change-password"
+            selected={getCurrentTab() === '/change-password'}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <LockIcon />
+            </ListItemIcon>
+            <ListItemText primary="Password" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
           <ListItemButton onClick={handleLogout}>
             <ListItemIcon sx={{ minWidth: 40 }}>
               <LogoutIcon />
@@ -238,20 +267,63 @@ const Layout = () => {
             ))}
           </Box>
 
-          {/* Logout Button - Desktop only */}
-          <Button
-            variant="outlined"
-            onClick={handleLogout}
-            size="small"
-            sx={{
-              display: { xs: 'none', lg: 'flex' },
-              minWidth: 'auto',
-              gap: 1,
-            }}
-          >
-            <LogoutIcon />
-            Logout
-          </Button>
+          {/* Account Menu - Desktop only */}
+          <Box sx={{ display: { xs: 'none', lg: 'flex' } }}>
+            <IconButton
+              onClick={handleMenuOpen}
+              size="small"
+              sx={{ ml: 2 }}
+            >
+              <MoreIcon />
+            </IconButton>
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={handleMenuClose}
+              transitionDuration={150}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              PaperProps={{
+                elevation: 3,
+                sx: { mt: 1, minWidth: 200 }
+              }}
+            >
+              <Box sx={{ px: 2, py: 1.5 }}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {user?.userName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {user?.role?.toUpperCase()}
+                </Typography>
+              </Box>
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  handleMenuClose();
+                  navigate('/change-password');
+                }}
+                sx={{ py: 1.5 }}
+              >
+                <ListItemIcon>
+                  <LockIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Change Password" />
+              </MenuItem>
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  handleMenuClose();
+                  handleLogout();
+                }}
+                sx={{ py: 1.5, color: 'error.main' }}
+              >
+                <ListItemIcon>
+                  <LogoutIcon fontSize="small" color="error" />
+                </ListItemIcon>
+                <ListItemText primary="Logout" />
+              </MenuItem>
+            </Menu>
+          </Box>
         </Toolbar>
       </AppBar>
 

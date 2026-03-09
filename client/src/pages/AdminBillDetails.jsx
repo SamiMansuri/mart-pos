@@ -381,8 +381,15 @@ const AdminBillDetails = () => {
                   mx: 1.5,
                 }}
               />
-              <Typography variant="body2" fontWeight={600} color={summary.round_adjustment < 0 ? 'error.main' : 'text.primary'}>
-                {summary.round_adjustment >= 0 ? '+' : ''}₹{summary.round_adjustment.toFixed(2)}
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                color={
+                  summary.round_adjustment < 0 ? 'error.main' : 'text.primary'
+                }
+              >
+                {summary.round_adjustment >= 0 ? '+' : ''}₹
+                {summary.round_adjustment.toFixed(2)}
               </Typography>
             </Box>
 

@@ -18,9 +18,11 @@ import {
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { productsApi } from '../api/api';
+import { isAdmin as checkAdmin } from '../utils/auth.utils';
 
 const AddProduct = () => {
   const navigate = useNavigate();
+  const isAdminUser = checkAdmin();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [formData, setFormData] = useState({
@@ -271,11 +273,16 @@ const AddProduct = () => {
                 type="number"
                 value={formData.quantity}
                 onChange={handleChange}
-                placeholder={formData.sale_type === 'UNIT' ? 'Whole number' : 'Decimal allowed'}
+                placeholder={
+                  formData.sale_type === 'UNIT'
+                    ? 'Whole number'
+                    : 'Decimal allowed'
+                }
                 inputProps={{
                   min: '0',
                   step: formData.sale_type === 'UNIT' ? '1' : '0.001',
-                  inputMode: formData.sale_type === 'UNIT' ? 'numeric' : 'decimal',
+                  inputMode:
+                    formData.sale_type === 'UNIT' ? 'numeric' : 'decimal',
                 }}
               />
             </Grid>
@@ -291,22 +298,24 @@ const AddProduct = () => {
                 placeholder='Defaults to "INITIAL"'
               />
             </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                label="Cost Price (Optional)"
-                name="cost_price"
-                type="number"
-                value={formData.cost_price}
-                onChange={handleChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">₹</InputAdornment>
-                  ),
-                }}
-                inputProps={{ step: '0.01', min: '0' }}
-              />
-            </Grid>
+            {isAdminUser && (
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Cost Price (Optional)"
+                  name="cost_price"
+                  type="number"
+                  value={formData.cost_price}
+                  onChange={handleChange}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">₹</InputAdornment>
+                    ),
+                  }}
+                  inputProps={{ step: '0.01', min: '0' }}
+                />
+              </Grid>
+            )}
             <Grid item xs={12} md={3}>
               <TextField
                 fullWidth

@@ -48,6 +48,7 @@ const BillView = () => {
       const billData = {
         bill: {
           bill_number: bill.bill_number,
+          invoice_number: bill.invoice_number,
           date: new Intl.DateTimeFormat('en-IN', {
             timeZone: 'Asia/Kolkata',
             dateStyle: 'medium',
@@ -183,11 +184,22 @@ const BillView = () => {
         <Box sx={{ mb: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="body2" sx={{ fontSize: '12px' }}>
-              Bill No:
+              Invoice No:
             </Typography>
             <Typography
               variant="body2"
               sx={{ fontSize: '12px', fontWeight: 'bold' }}
+            >
+              #{bill.invoice_number}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="body2" sx={{ fontSize: '12px' }}>
+              Bill No:
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ fontSize: '12px' }}
             >
               {bill.bill_number}
             </Typography>
