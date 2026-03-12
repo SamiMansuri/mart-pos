@@ -10,7 +10,12 @@ import {
   hasRefunds,
   logBillEvent,
 } from "../services/bill.service.js";
-import { BILL_QUERIES, BATCH_QUERIES, STOCK_QUERIES } from "../db/queries.js";
+import {
+  BILL_QUERIES,
+  BATCH_QUERIES,
+  STOCK_QUERIES,
+  CUSTOMER_QUERIES,
+} from "../db/queries.js";
 
 export const createBill = asyncHandler(async (req, res) => {
   const {
@@ -19,15 +24,29 @@ export const createBill = asyncHandler(async (req, res) => {
     idempotency_key,
     business_date,
     round_adjustment,
+    is_credit = false,
+    customer_id = null,
+    paid_amount = null,
   } = req.body;
   const { user_id } = req.user;
 
-  if (!idempotency_key) {
+  if (!idempotency_key)
     throw createHttpError(400, "Idempotency key is required");
-  }
-
   if (!items?.length) throw createHttpError(400, "Cart is empty");
 
+  if (is_credit) {
+    if (!customer_id)
+      throw createHttpError(400, "customer_id is required for credit bills");
+    if (paid_amount === null || paid_amount === undefined)
+      throw createHttpError(400, "paid_amount is required for credit bills");
+    if (paid_amount < 0)
+      throw createHttpError(400, "paid_amount cannot be negative");
+    if (!payment_method && paid_amount > 0)
+      throw createHttpError(
+        400,
+        "payment_method is required when paid_amount > 0",
+      );
+  }
   const normalizedItems = normalizeItems(items);
 
   const result = await withTransaction(async (client) => {
@@ -37,6 +56,16 @@ export const createBill = asyncHandler(async (req, res) => {
 
     if (existingBill.rows.length) {
       return { isNew: false, bill: existingBill.rows[0] };
+    }
+
+    let customer = null;
+    if (is_credit) {
+      const { rows: custRows } = await client.query(
+        CUSTOMER_QUERIES.GET_CUSTOMER_BY_ID,
+        [customer_id],
+      );
+      if (!custRows.length) throw createHttpError(404, "Customer not found");
+      customer = custRows[0];
     }
 
     let subTotal = 0;
@@ -61,6 +90,30 @@ export const createBill = asyncHandler(async (req, res) => {
       subTotal += product.selling_price * item.quantity;
     }
 
+    const totalAmount = subTotal - round_adjustment;
+
+    if (is_credit) {
+      const creditLimit = parseFloat(customer.credit_limit);
+      const creditAmount = totalAmount - paid_amount; // what goes on account
+
+      if (creditAmount <= 0) {
+        throw createHttpError(
+          400,
+          "paid_amount exceeds or equals total. Use normal payment instead",
+        );
+      }
+
+      if (creditLimit > 0) {
+        const currentDue = parseFloat(customer.total_due);
+        if (currentDue + creditAmount > creditLimit) {
+          throw createHttpError(
+            400,
+            `Credit limit exceeded. Limit: ${creditLimit}, Current due: ${currentDue}, This credit: ${creditAmount}`,
+          );
+        }
+      }
+    }
+
     const counterRes = await client.query(
       BILL_QUERIES.GET_NEXT_INVOICE_NUMBER,
       [business_date],
@@ -81,19 +134,39 @@ export const createBill = asyncHandler(async (req, res) => {
 
     const billNumber = `BILL-${Date.now()}`;
 
-    const totalAmount = subTotal - round_adjustment;
+    let billRes;
 
-    const billRes = await client.query(BILL_QUERIES.CREATE, [
-      billNumber,
-      totalAmount,
-      payment_method,
-      idempotency_key,
-      user_id,
-      nextNumber,
-      business_date,
-      subTotal,
-      round_adjustment,
-    ]);
+    if (is_credit) {
+      const effectivePaymentMethod = paid_amount > 0 ? payment_method : "CASH";
+
+      billRes = await client.query(BILL_QUERIES.CREATE_CREDIT, [
+        billNumber, // $1
+        totalAmount, // $2
+        effectivePaymentMethod, // $3
+        idempotency_key, // $4
+        user_id, // $5
+        nextNumber, // $6
+        business_date, // $7
+        subTotal, // $8
+        round_adjustment, // $9
+        customer_id, // $10
+        paid_amount, // $11
+      ]);
+    } else {
+      billRes = await client.query(BILL_QUERIES.CREATE, [
+        billNumber,
+        totalAmount,
+        payment_method,
+        idempotency_key,
+        user_id,
+        nextNumber,
+        business_date,
+        subTotal,
+        round_adjustment,
+      ]);
+    }
+
+    const billId = billRes.rows[0].id;
 
     await logBillEvent({
       client,
@@ -102,7 +175,27 @@ export const createBill = asyncHandler(async (req, res) => {
       performedBy: user_id,
     });
 
-    const billId = billRes.rows[0].id;
+    if (is_credit) {
+      const creditAmount = totalAmount - paid_amount;
+
+      // 1. Increase total_due
+      const { rows: updRows } = await client.query(
+        CUSTOMER_QUERIES.UPDATE_TOTAL_DUE,
+        [creditAmount, customer_id],
+      );
+      const balanceAfter = parseFloat(updRows[0].total_due);
+
+      // 2. Write ledger entry
+      await client.query(CUSTOMER_QUERIES.INSERT_LEDGER_ENTRY, [
+        customer_id,
+        "CREDIT",
+        creditAmount,
+        balanceAfter,
+        billId,
+        `Bill ${billNumber}${paid_amount > 0 ? ` (partial, paid: ${paid_amount})` : ""}`,
+        user_id,
+      ]);
+    }
 
     for (const item of normalizedItems) {
       const product = productMap.get(item.product_id);
@@ -996,6 +1089,43 @@ export const editBill = asyncHandler(async (req, res) => {
     getSuccessResponse({
       data: result,
       message: "Bill updated successfully",
+      status: 200,
+    }),
+  );
+});
+
+export const getBillsByCustomer = asyncHandler(async (req, res) => {
+  const { id: customer_id } = req.params;
+  const { limit = 10, page = 1 } = req.query;
+
+  const parsedLimit = parseInt(limit);
+  const parsedPage = parseInt(page);
+  const offset = (parsedPage - 1) * parsedLimit;
+
+  const [billsRes, countRes] = await Promise.all([
+    pool.query(BILL_QUERIES.GET_BY_CUSTOMER_PAGINATED, [
+      customer_id,
+      parsedLimit,
+      offset,
+    ]),
+    pool.query(BILL_QUERIES.COUNT_BY_CUSTOMER, [customer_id]),
+  ]);
+
+  const total = parseInt(countRes.rows[0].count);
+  const totalPages = Math.ceil(total / parsedLimit);
+
+  res.json(
+    getSuccessResponse({
+      data: {
+        bills: billsRes.rows,
+        pagination: {
+          total,
+          totalPages,
+          page: parsedPage,
+          limit: parsedLimit,
+        },
+      },
+      message: "Customer bills fetched successfully",
       status: 200,
     }),
   );
