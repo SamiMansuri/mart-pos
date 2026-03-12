@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { productsApi, billsApi } from '../api/api';
+import { productsApi, billsApi, customersApi } from '../api/api';
 import {
   Box,
   Grid,
@@ -34,6 +34,8 @@ import {
   List,
   ListItem,
   ListItemText,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -43,7 +45,9 @@ import {
   ShoppingCart as CartIcon,
   Money as CashIcon,
   QrCode2 as UpiIcon,
+  PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
+import AddCustomerModal from '../components/AddCustomerModal';
 
 // ProductCard component removed as it's no longer used in the new layout
 
@@ -61,6 +65,15 @@ const CashierDashboard = () => {
   const [selectedCartIndex, setSelectedCartIndex] = useState(-1);
   const [roundAdjust, setRoundAdjust] = useState(0);
   const qtyRefs = useRef([]);
+
+  // Credit Bill State
+  const [isCredit, setIsCredit] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [paidAmount, setPaidAmount] = useState('');
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
 
   // Barcode Scanning State
   // Migrated to global listener for better reliability
@@ -312,6 +325,23 @@ const CashierDashboard = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, fetchProducts]);
 
+  useEffect(() => {
+    if (!isCredit) return;
+    const fetchCust = async () => {
+      setCustomersLoading(true);
+      try {
+        const data = await customersApi.getAll(customerSearchTerm);
+        setCustomerOptions(data || []);
+      } catch (err) {
+        console.error('Failed to fetch customers', err);
+      } finally {
+        setCustomersLoading(false);
+      }
+    };
+    const delay = setTimeout(fetchCust, 500);
+    return () => clearTimeout(delay);
+  }, [customerSearchTerm, isCredit]);
+
   const updateQuantity = useCallback(
     (productId, deltaOrQty, isManual = false) => {
       setCart((prevCart) =>
@@ -400,6 +430,11 @@ const CashierDashboard = () => {
   };
   const handleCheckout = async (shouldPrint = true) => {
     if (cart.length === 0) return;
+    if (isCredit && !selectedCustomer) {
+      setStatus({ type: 'error', message: 'Please select a customer for credit bill' });
+      return;
+    }
+
     setProcessing(true);
     setStatus({ type: '', message: '' });
 
@@ -417,6 +452,11 @@ const CashierDashboard = () => {
         idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         business_date: new Date().toISOString().split('T')[0],
         round_adjustment: Number(roundAdjust || 0),
+        ...(isCredit && {
+          is_credit: true,
+          customer_id: selectedCustomer.id,
+          paid_amount: Number(paidAmount || 0)
+        })
       });
 
       setStatus({
@@ -443,12 +483,21 @@ const CashierDashboard = () => {
       setCart([]);
       setPaymentMethod('CASH'); // Reset payment method after checkout
       setRoundAdjust(0); // Reset round adjust after checkout
+      setIsCredit(false);
+      setSelectedCustomer(null);
+      setPaidAmount('');
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Checkout failed' });
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleCustomerCreated = (newCustomer) => {
+    setCustomerOptions((prev) => [newCustomer, ...prev]);
+    setSelectedCustomer(newCustomer);
+    setAddCustomerModalOpen(false);
   };
 
   // Removal of client-side filtering logic
@@ -956,7 +1005,79 @@ const CashierDashboard = () => {
             </Box>
 
             <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+              <FormControlLabel
+                control={<Switch checked={isCredit} onChange={(e) => setIsCredit(e.target.checked)} color="primary" />}
+                label={<Typography fontWeight={700}>Credit Bill</Typography>}
+              />
+              
+              {isCredit && (
+                <Box sx={{ mt: 2, mb: 2, display: 'flex', flexDirection: 'column', gap: 2, p: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<PersonAddIcon />}
+                    onClick={() => setAddCustomerModalOpen(true)}
+                    sx={{ fontWeight: 700, borderRadius: 2, textTransform: 'none', mb: 1 }}
+                  >
+                    New Customer
+                  </Button>
+                  
+                  <Autocomplete
+                    options={customerOptions}
+                    getOptionLabel={(option) => `${option.name} (${option.phone || 'N/A'}) - Due: ₹${parseFloat(option.total_due).toFixed(2)}`}
+                    value={selectedCustomer}
+                    onChange={(_, newValue) => setSelectedCustomer(newValue)}
+                    onInputChange={(_, newInputValue) => setCustomerSearchTerm(newInputValue)}
+                    renderInput={(params) => (
+                      <TextField 
+                        {...params} 
+                        label="Select Customer" 
+                        size="small" 
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <React.Fragment>
+                              {customersLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                              {params.InputProps.endAdornment}
+                            </React.Fragment>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
+                  {selectedCustomer && (
+                    <>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Current Due:</Typography>
+                        <Typography variant="body2" fontWeight={700} color="error.main">₹{parseFloat(selectedCustomer.total_due).toFixed(2)}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Credit Limit:</Typography>
+                        <Typography variant="body2" fontWeight={700}>
+                          {parseFloat(selectedCustomer.credit_limit) === 0 ? 'No Limit' : `₹${parseFloat(selectedCustomer.credit_limit).toFixed(2)}`}
+                        </Typography>
+                      </Box>
+                    </>
+                  )}
+                  <TextField 
+                    label="Paid at Counter"
+                    type="number"
+                    size="small"
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(e.target.value)}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                    }}
+                  />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                    <Typography fontWeight={700} color="primary.main">Credit Amount:</Typography>
+                    <Typography fontWeight={800} color="primary.main">₹{Math.max(0, total - Number(paidAmount || 0)).toFixed(2)}</Typography>
+                  </Box>
+                </Box>
+              )}
+
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1, mb: 1.5 }}>
                 Payment Method
               </Typography>
               <ToggleButtonGroup
@@ -1087,6 +1208,13 @@ const CashierDashboard = () => {
           {status.message}
         </Alert>
       )}
+
+      {/* Add Customer Modal */}
+      <AddCustomerModal
+        open={addCustomerModalOpen}
+        onClose={() => setAddCustomerModalOpen(false)}
+        onSuccess={handleCustomerCreated}
+      />
     </Box>
   );
 };

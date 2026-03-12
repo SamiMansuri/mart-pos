@@ -151,8 +151,16 @@ export const BILL_QUERIES = {
     SET last_number = $1
     WHERE business_date = $2
   `,
-  CREATE:
-    "INSERT INTO bills (bill_number, total_amount, payment_method, idempotency_key, created_by, payment_status, invoice_number, business_date, sub_total, round_adjustment) VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7, $8, $9) RETURNING *",
+  CREATE: `
+    INSERT INTO bills (
+      bill_number, total_amount, payment_method, idempotency_key,
+      created_by, payment_status, invoice_number, business_date,
+      sub_total, round_adjustment,
+      is_credit, customer_id, paid_amount
+    )
+    VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7, $8, $9, false, NULL, $2)
+    RETURNING *
+  `,
   CREATE_ITEM:
     "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price, mrp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
   GET_BY_ID: `SELECT
@@ -176,4 +184,122 @@ export const BILL_QUERIES = {
      JOIN bill_items bi ON bi.bill_id = b.id
      JOIN products p ON p.id = bi.product_id
      WHERE b.id = $1 ORDER BY bi.id ASC`,
+  CREATE_CREDIT: `
+    INSERT INTO bills (
+      bill_number, total_amount, payment_method, idempotency_key,
+      created_by, payment_status, invoice_number, business_date,
+      sub_total, round_adjustment,
+      is_credit, customer_id, paid_amount
+    )
+    VALUES ($1, $2, $3, $4, $5, 'UNPAID', $6, $7, $8, $9, true, $10, $11)
+    RETURNING *
+  `,
+  GET_BY_CUSTOMER_PAGINATED: `
+    SELECT * FROM bills 
+    WHERE customer_id = $1 
+    ORDER BY created_at DESC 
+    LIMIT $2 OFFSET $3
+  `,
+  COUNT_BY_CUSTOMER: `
+    SELECT COUNT(*) FROM bills WHERE customer_id = $1
+  `,
+};
+
+export const CUSTOMER_QUERIES = {
+  // --- CRUD ---
+  INSERT_CUSTOMER: `
+    INSERT INTO customers (name, phone, credit_limit, notes, created_by)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING *
+  `,
+
+  GET_ALL_CUSTOMERS: `
+    SELECT c.id, c.name, c.phone, c.credit_limit, c.total_due, c.notes, c.created_at,
+    u.name AS created_by_name
+    FROM customers c
+    JOIN users u ON u.id = c.created_by
+    ORDER BY c.name ASC
+  `,
+  SEARCH_CUSTOMERS: `
+    SELECT id, name, phone, credit_limit, total_due, notes, created_at
+    FROM customers
+    WHERE name ILIKE $1 OR phone ILIKE $1
+    ORDER BY name ASC
+    LIMIT 20
+  `,
+
+  GET_CUSTOMER_BY_ID: `
+    SELECT c.id, c.name, c.phone, c.credit_limit, c.total_due, c.notes, c.created_at,
+    u.name AS created_by_name
+    FROM customers c
+    JOIN users u ON u.id = c.created_by
+    WHERE c.id = $1
+  `,
+
+  GET_CUSTOMER_BY_PHONE: `
+    SELECT id, name, phone, credit_limit, total_due, notes, created_at
+    FROM customers
+    WHERE phone = $1
+  `,
+
+  UPDATE_CUSTOMER: `
+    UPDATE customers
+    SET name = $1, phone = $2, credit_limit = $3, notes = $4, updated_at = now()
+    WHERE id = $5
+    RETURNING id, name, phone, credit_limit, total_due, notes, created_at
+  `,
+
+  // --- Ledger ---
+  GET_CUSTOMER_LEDGER: `
+    SELECT id, type, amount, balance_after, reference_id, note, created_at
+    FROM customer_ledger
+    WHERE customer_id = $1
+    ORDER BY created_at DESC
+  `,
+
+  GET_CUSTOMER_LEDGER_PAGINATED: `
+    SELECT id, type, amount, balance_after, reference_id, note, created_at
+    FROM customer_ledger
+    WHERE customer_id = $1
+    ORDER BY created_at DESC
+    LIMIT $2 OFFSET $3
+  `,
+
+  COUNT_LEDGER: `
+    SELECT COUNT(*) FROM customer_ledger WHERE customer_id = $1
+  `,
+
+  INSERT_LEDGER_ENTRY: `
+    INSERT INTO customer_ledger (customer_id, type, amount, balance_after, reference_id, note, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *
+  `,
+
+  // --- Payments ---
+  INSERT_CREDIT_PAYMENT: `
+    INSERT INTO credit_payments (customer_id, amount, note, created_by)
+    VALUES ($1, $2, $3, $4)
+    RETURNING *
+  `,
+
+  GET_CREDIT_PAYMENTS: `
+    SELECT cp.id, cp.amount, cp.note, cp.created_at,
+    u.name AS collected_by
+    FROM credit_payments cp
+    JOIN users u ON u.id = cp.created_by
+    WHERE cp.customer_id = $1
+    ORDER BY cp.created_at DESC
+  `,
+  // --- Balance ---
+  UPDATE_TOTAL_DUE: `
+    UPDATE customers
+    SET total_due = total_due + $1, updated_at = now()
+    WHERE id = $2
+    RETURNING total_due
+  `,
+
+  // Used to compute balance_after before inserting ledger entry
+  GET_CURRENT_BALANCE: `
+    SELECT total_due FROM customers WHERE id = $1
+  `,
 };

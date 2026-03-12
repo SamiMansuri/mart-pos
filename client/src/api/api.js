@@ -85,6 +85,8 @@ export const billsApi = {
       method: 'PATCH',
       body: JSON.stringify(billData),
     }),
+  getByCustomer: (id, page = 1, limit = 10) =>
+    apiFetch(`/bills/customer/${id}?page=${page}&limit=${limit}`),
 };
 
 export const productsApi = {
@@ -138,6 +140,38 @@ export const usersApi = {
     apiFetch('/users', {
       method: 'POST',
       body: JSON.stringify(userData),
+    }),
+};
+
+export const customersApi = {
+  getAll: (search = '') => {
+    let url = '/customers';
+    if (search) url += `?q=${encodeURIComponent(search)}`;
+    return apiFetch(url);
+  },
+  getById: (id) => apiFetch(`/customers/${id}`),
+  create: (customerData) =>
+    apiFetch('/customers', {
+      method: 'POST',
+      body: JSON.stringify(customerData),
+    }),
+  update: (id, customerData) =>
+    apiFetch(`/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(customerData),
+    }),
+  getLedger: (id, page, limit) => {
+    let url = `/customers/${id}/ledger`;
+    if (page && limit) url += `?page=${page}&limit=${limit}`;
+    return apiFetch(url);
+  },
+};
+
+export const paymentsApi = {
+  create: (customerId, paymentData) =>
+    apiFetch(`/customers/${customerId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
     }),
 };
 

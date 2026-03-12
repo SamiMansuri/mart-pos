@@ -19,6 +19,10 @@ import Reports from './pages/Reports';
 import CashierReport from './pages/CashierReport';
 import StockEntry from './pages/StockEntry';
 import ChangePassword from './pages/ChangePassword';
+import CustomersList from './pages/CustomersList';
+import CustomerProfile from './pages/CustomerProfile';
+import CustomerLedgerAll from './pages/CustomerLedgerAll';
+import CustomerBillsAll from './pages/CustomerBillsAll';
 import { getUserInfo, isTokenExpired } from './utils/auth.utils';
 
 // Guard for authenticated sessions
@@ -129,6 +133,38 @@ function App() {
             element={
               <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <BillView />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="customers"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <CustomersList />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="customers/:id"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <CustomerProfile />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="customers/:id/ledger"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <CustomerLedgerAll />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="customers/:id/bills"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <CustomerBillsAll />
               </RoleGuard>
             }
           />

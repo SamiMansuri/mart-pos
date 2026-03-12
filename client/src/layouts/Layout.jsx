@@ -31,6 +31,7 @@ import {
   BarChart as ReportsIcon,
   Lock as LockIcon,
   MoreVert as MoreIcon,
+  Contacts as ContactsIcon,
 } from '@mui/icons-material';
 import { isAdmin, isCashier, getUserInfo } from '../utils/auth.utils';
 import { authApi } from '../api/api';
@@ -105,6 +106,7 @@ const Layout = () => {
       : []),
     { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
     { text: 'Cashier Report', icon: <ReportsIcon />, path: '/cashier/report' },
+    { text: 'Customers', icon: <ContactsIcon />, path: '/customers' },
     { text: 'History', icon: <HistoryIcon />, path: '/history' },
   ];
 
