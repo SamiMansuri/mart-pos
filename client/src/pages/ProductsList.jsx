@@ -23,9 +23,13 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Search as SearchIcon,
+  Print as PrintIcon,
 } from '@mui/icons-material';
+import { Snackbar } from '@mui/material';
 import { productsApi } from '../api/api';
 import { isAdmin as checkAdmin } from '../utils/auth.utils';
+import PrintBarcodeModal from '../components/PrintBarcodeModal';
+import { printBarcodeLabel } from '../services/print.service';
 
 const ProductsList = () => {
   const navigate = useNavigate();
@@ -41,6 +45,11 @@ const ProductsList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const limit = 10;
+
+  // Print Barcode State
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [selectedProductForPrint, setSelectedProductForPrint] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // Handle search debouncing
   useEffect(() => {
@@ -84,6 +93,24 @@ const ProductsList = () => {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const handleOpenPrintModal = (product) => {
+    setSelectedProductForPrint(product);
+    setPrintModalOpen(true);
+  };
+
+  const handlePrintBarcode = async (product, quantity) => {
+    try {
+      await printBarcodeLabel(product, quantity);
+      setSnackbar({ open: true, message: 'Barcode label printed successfully!', severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: err.message || 'Error printing barcode label', severity: 'error' });
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   return (
@@ -294,6 +321,15 @@ const ProductsList = () => {
                     <TableCell align="right">
                       <IconButton
                         size="small"
+                        color="secondary"
+                        onClick={() => handleOpenPrintModal(product)}
+                        sx={{ mr: 1 }}
+                        title="Print Barcode Labels"
+                      >
+                        <PrintIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
                         color="primary"
                         onClick={() =>
                           navigate(`/admin/products/edit/${product.id}`, {
@@ -323,6 +359,30 @@ const ProductsList = () => {
           )}
         </>
       )}
+
+      {/* Print Barcode Modal */}
+      <PrintBarcodeModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        product={selectedProductForPrint}
+        onPrint={handlePrintBarcode}
+      />
+
+      {/* Feedback Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%', fontWeight: 700, borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
