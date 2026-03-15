@@ -111,7 +111,9 @@ const CashierDashboard = () => {
 
   const addToCart = useCallback((product) => {
     setCart((prevCart) => {
-      const existingItemIndex = prevCart.findIndex((item) => item.id === product.id);
+      const existingItemIndex = prevCart.findIndex(
+        (item) => item.id === product.id,
+      );
 
       if (existingItemIndex > -1) {
         const newCart = [...prevCart];
@@ -359,11 +361,13 @@ const CashierDashboard = () => {
               } else {
                 // For UNIT: integers only
                 newQty = deltaOrQty === '' ? '' : parseInt(deltaOrQty, 10);
-                if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1)) return item;
+                if (deltaOrQty !== '' && (isNaN(newQty) || newQty < 1))
+                  return item;
               }
             } else {
               // +/- buttons: always numeric
-              const current = parseFloat(item.quantity) || (isWeight ? 0.001 : 1);
+              const current =
+                parseFloat(item.quantity) || (isWeight ? 0.001 : 1);
               newQty = Math.max(isWeight ? 0.001 : 1, current + deltaOrQty);
               if (isWeight) {
                 // Round to 3 decimal places to avoid floating point drift
@@ -386,7 +390,10 @@ const CashierDashboard = () => {
 
   const total = subTotal - Number(roundAdjust || 0);
 
-  const totalItems = cart.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+  const totalItems = cart.reduce(
+    (sum, item) => sum + (parseFloat(item.quantity) || 0),
+    0,
+  );
 
   const printBill = async (
     cartItems,
@@ -414,7 +421,7 @@ const CashierDashboard = () => {
         },
       };
 
-      await fetch('http://localhost:3005/print', {
+      await fetch('http://localhost:5000/print', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -431,7 +438,10 @@ const CashierDashboard = () => {
   const handleCheckout = async (shouldPrint = true) => {
     if (cart.length === 0) return;
     if (isCredit && !selectedCustomer) {
-      setStatus({ type: 'error', message: 'Please select a customer for credit bill' });
+      setStatus({
+        type: 'error',
+        message: 'Please select a customer for credit bill',
+      });
       return;
     }
 
@@ -455,8 +465,8 @@ const CashierDashboard = () => {
         ...(isCredit && {
           is_credit: true,
           customer_id: selectedCustomer.id,
-          paid_amount: Number(paidAmount || 0)
-        })
+          paid_amount: Number(paidAmount || 0),
+        }),
       });
 
       setStatus({
@@ -802,7 +812,12 @@ const CashierDashboard = () => {
                         >
                           <IconButton
                             size="small"
-                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? -0.5 : -1)}
+                            onClick={() =>
+                              updateQuantity(
+                                item.id,
+                                item.sale_type === 'WEIGHT' ? -0.5 : -1,
+                              )
+                            }
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <RemoveIcon fontSize="small" />
@@ -831,15 +846,19 @@ const CashierDashboard = () => {
                                 // Snap to minimum
                                 setCart((prev) =>
                                   prev.map((ci) =>
-                                    ci.id === item.id ? { ...ci, quantity: minQty } : ci
-                                  )
+                                    ci.id === item.id
+                                      ? { ...ci, quantity: minQty }
+                                      : ci,
+                                  ),
                                 );
                               } else {
                                 // Commit the parsed number (removes trailing dots)
                                 setCart((prev) =>
                                   prev.map((ci) =>
-                                    ci.id === item.id ? { ...ci, quantity: parsed } : ci
-                                  )
+                                    ci.id === item.id
+                                      ? { ...ci, quantity: parsed }
+                                      : ci,
+                                  ),
                                 );
                               }
                             }}
@@ -851,8 +870,14 @@ const CashierDashboard = () => {
                                 fontWeight: 700,
                                 fontSize: '0.875rem',
                               },
-                              inputMode: item.sale_type === 'WEIGHT' ? 'decimal' : 'numeric',
-                              pattern: item.sale_type === 'WEIGHT' ? '[0-9]*\.?[0-9]*' : '[0-9]*',
+                              inputMode:
+                                item.sale_type === 'WEIGHT'
+                                  ? 'decimal'
+                                  : 'numeric',
+                              pattern:
+                                item.sale_type === 'WEIGHT'
+                                  ? '[0-9]*\.?[0-9]*'
+                                  : '[0-9]*',
                             }}
                             variant="outlined"
                             sx={{
@@ -871,7 +896,12 @@ const CashierDashboard = () => {
                           />
                           <IconButton
                             size="small"
-                            onClick={() => updateQuantity(item.id, item.sale_type === 'WEIGHT' ? 0.5 : 1)}
+                            onClick={() =>
+                              updateQuantity(
+                                item.id,
+                                item.sale_type === 'WEIGHT' ? 0.5 : 1,
+                              )
+                            }
                             sx={{ border: '1px solid', borderColor: 'divider' }}
                           >
                             <AddIcon fontSize="small" />
@@ -1006,39 +1036,69 @@ const CashierDashboard = () => {
 
             <Box sx={{ mt: 2 }}>
               <FormControlLabel
-                control={<Switch checked={isCredit} onChange={(e) => setIsCredit(e.target.checked)} color="primary" />}
+                control={
+                  <Switch
+                    checked={isCredit}
+                    onChange={(e) => setIsCredit(e.target.checked)}
+                    color="primary"
+                  />
+                }
                 label={<Typography fontWeight={700}>Credit Bill</Typography>}
               />
-              
+
               {isCredit && (
-                <Box sx={{ mt: 2, mb: 2, display: 'flex', flexDirection: 'column', gap: 2, p: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                <Box
+                  sx={{
+                    mt: 2,
+                    mb: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                    p: 2,
+                    bgcolor: 'rgba(0,0,0,0.02)',
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
                   <Button
                     fullWidth
                     variant="outlined"
                     color="primary"
                     startIcon={<PersonAddIcon />}
                     onClick={() => setAddCustomerModalOpen(true)}
-                    sx={{ fontWeight: 700, borderRadius: 2, textTransform: 'none', mb: 1 }}
+                    sx={{
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      mb: 1,
+                    }}
                   >
                     New Customer
                   </Button>
-                  
+
                   <Autocomplete
                     options={customerOptions}
-                    getOptionLabel={(option) => `${option.name} (${option.phone || 'N/A'}) - Due: ₹${parseFloat(option.total_due).toFixed(2)}`}
+                    getOptionLabel={(option) =>
+                      `${option.name} (${option.phone || 'N/A'}) - Due: ₹${parseFloat(option.total_due).toFixed(2)}`
+                    }
                     value={selectedCustomer}
                     onChange={(_, newValue) => setSelectedCustomer(newValue)}
-                    onInputChange={(_, newInputValue) => setCustomerSearchTerm(newInputValue)}
+                    onInputChange={(_, newInputValue) =>
+                      setCustomerSearchTerm(newInputValue)
+                    }
                     renderInput={(params) => (
-                      <TextField 
-                        {...params} 
-                        label="Select Customer" 
-                        size="small" 
+                      <TextField
+                        {...params}
+                        label="Select Customer"
+                        size="small"
                         InputProps={{
                           ...params.InputProps,
                           endAdornment: (
                             <React.Fragment>
-                              {customersLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                              {customersLoading ? (
+                                <CircularProgress color="inherit" size={20} />
+                              ) : null}
                               {params.InputProps.endAdornment}
                             </React.Fragment>
                           ),
@@ -1048,36 +1108,74 @@ const CashierDashboard = () => {
                   />
                   {selectedCustomer && (
                     <>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Current Due:</Typography>
-                        <Typography variant="body2" fontWeight={700} color="error.main">₹{parseFloat(selectedCustomer.total_due).toFixed(2)}</Typography>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Current Due:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          color="error.main"
+                        >
+                          ₹{parseFloat(selectedCustomer.total_due).toFixed(2)}
+                        </Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Credit Limit:</Typography>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Credit Limit:
+                        </Typography>
                         <Typography variant="body2" fontWeight={700}>
-                          {parseFloat(selectedCustomer.credit_limit) === 0 ? 'No Limit' : `₹${parseFloat(selectedCustomer.credit_limit).toFixed(2)}`}
+                          {parseFloat(selectedCustomer.credit_limit) === 0
+                            ? 'No Limit'
+                            : `₹${parseFloat(selectedCustomer.credit_limit).toFixed(2)}`}
                         </Typography>
                       </Box>
                     </>
                   )}
-                  <TextField 
+                  <TextField
                     label="Paid at Counter"
                     type="number"
                     size="small"
                     value={paidAmount}
                     onChange={(e) => setPaidAmount(e.target.value)}
                     InputProps={{
-                      startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                      startAdornment: (
+                        <InputAdornment position="start">₹</InputAdornment>
+                      ),
                     }}
                   />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <Typography fontWeight={700} color="primary.main">Credit Amount:</Typography>
-                    <Typography fontWeight={800} color="primary.main">₹{Math.max(0, total - Number(paidAmount || 0)).toFixed(2)}</Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      mt: 1,
+                    }}
+                  >
+                    <Typography fontWeight={700} color="primary.main">
+                      Credit Amount:
+                    </Typography>
+                    <Typography fontWeight={800} color="primary.main">
+                      ₹{Math.max(0, total - Number(paidAmount || 0)).toFixed(2)}
+                    </Typography>
                   </Box>
                 </Box>
               )}
 
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1, mb: 1.5 }}>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                sx={{ mt: 1, mb: 1.5 }}
+              >
                 Payment Method
               </Typography>
               <ToggleButtonGroup
