@@ -66,7 +66,7 @@ const BillView = () => {
         },
       };
 
-      await fetch('http://localhost:3005/print', {
+      await fetch('http://localhost:5000/print', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,10 +197,7 @@ const BillView = () => {
             <Typography variant="body2" sx={{ fontSize: '12px' }}>
               Bill No:
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ fontSize: '12px' }}
-            >
+            <Typography variant="body2" sx={{ fontSize: '12px' }}>
               {bill.bill_number}
             </Typography>
           </Box>
