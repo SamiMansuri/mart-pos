@@ -57,7 +57,8 @@ export const getCashierReport = asyncHandler(async (req, res) => {
     SELECT 
       COALESCE(SUM(sub_total), 0) as gross_sales,
       COALESCE(SUM(round_adjustment), 0) as total_round_adjustment,
-      COALESCE(SUM(total_amount), 0) as total_sales
+      COALESCE(SUM(total_amount), 0) as total_sales,
+      COALESCE(SUM(credit_amount), 0) as credit_sales
     FROM bills 
     WHERE business_date = $1 AND is_void = false
   `;
@@ -72,10 +73,11 @@ export const getCashierReport = asyncHandler(async (req, res) => {
   const paymentSalesQuery = `
     SELECT 
       payment_method,
+      payment_status,
       COALESCE(SUM(total_amount), 0) as amount
     FROM bills 
     WHERE business_date = $1 AND is_void = false
-    GROUP BY payment_method
+    GROUP BY payment_method, payment_status
   `;
 
   const paymentReturnsQuery = `
@@ -107,8 +109,9 @@ export const getCashierReport = asyncHandler(async (req, res) => {
   const grossSales = parseFloat(summaryRes.rows[0].gross_sales);
   const totalReturns = parseFloat(returnsRes.rows[0].total_returns);
   const roundAdjustment = parseFloat(summaryRes.rows[0].total_round_adjustment);
-  const netSales = grossSales - totalReturns;
-  const finalCollected = netSales + roundAdjustment;
+  const netSales = grossSales - totalReturns - roundAdjustment;
+  const creditSales = parseFloat(summaryRes.rows[0].credit_sales);
+  const finalCollected = netSales - creditSales;
 
   // Process payment breakdown
   const payments = {
@@ -117,7 +120,10 @@ export const getCashierReport = asyncHandler(async (req, res) => {
   };
 
   pSalesRes.rows.forEach((row) => {
-    if (payments.hasOwnProperty(row.payment_method)) {
+    if (
+      payments.hasOwnProperty(row.payment_method) &&
+      row.payment_status === "PAID"
+    ) {
       payments[row.payment_method] += parseFloat(row.amount);
     }
   });
@@ -137,6 +143,7 @@ export const getCashierReport = asyncHandler(async (req, res) => {
         totalReturns,
         netSales,
         roundAdjustment,
+        creditSales,
         finalCollected,
       },
       paymentBreakdown: payments,

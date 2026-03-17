@@ -14,8 +14,8 @@ export const printStatement = async (customer) => {
       name: customer.name,
       phone: customer.phone || null,
       total_due: parseFloat(customer.total_due || 0),
-      date: formattedDate
-    }
+      date: formattedDate,
+    },
   };
 
   try {
@@ -43,11 +43,11 @@ export const printBarcodeLabel = async (product, quantity) => {
   const payload = {
     label: {
       product_name: product.name,
-      mrp: product.mrp ? String(product.mrp) : "0",
-      price: product.selling_price ? String(product.selling_price) : "0",
-      barcode: product.barcode || "",
-      quantity: quantity
-    }
+      mrp: product.mrp ? String(product.mrp) : '0',
+      price: product.selling_price ? String(product.selling_price) : '0',
+      barcode: product.barcode || '',
+      quantity: quantity,
+    },
   };
 
   try {
