@@ -144,6 +144,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
       balanceAfter,
       payment.id,
       note || null,
+      created_by,
     ]);
 
     return { payment, balance_after: balanceAfter };
