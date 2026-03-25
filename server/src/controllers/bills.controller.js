@@ -328,6 +328,7 @@ export const getBillById = asyncHandler(async (req, res) => {
       price: row.price,
       line_total: row.line_total,
       mrp: row.mrp,
+      sale_type: row.sale_type,
     })),
   };
 
