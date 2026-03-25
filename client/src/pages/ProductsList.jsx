@@ -24,11 +24,13 @@ import {
   Edit as EditIcon,
   Search as SearchIcon,
   Print as PrintIcon,
+  Block as BlockIcon,
 } from '@mui/icons-material';
 import { Snackbar } from '@mui/material';
 import { productsApi } from '../api/api';
 import { isAdmin as checkAdmin } from '../utils/auth.utils';
 import PrintBarcodeModal from '../components/PrintBarcodeModal';
+import UpdateProductModal from '../components/UpdateProductModal';
 import { printBarcodeLabel } from '../services/print.service';
 
 const ProductsList = () => {
@@ -44,11 +46,16 @@ const ProductsList = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const limit = 10;
+  const limit = 100;
 
   // Print Barcode State
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [selectedProductForPrint, setSelectedProductForPrint] = useState(null);
+
+  // Update Product State
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [selectedProductIdToUpdate, setSelectedProductIdToUpdate] = useState(null);
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // Handle search debouncing
@@ -98,6 +105,33 @@ const ProductsList = () => {
   const handleOpenPrintModal = (product) => {
     setSelectedProductForPrint(product);
     setPrintModalOpen(true);
+  };
+
+  const handleOpenUpdateModal = (productId) => {
+    setSelectedProductIdToUpdate(productId);
+    setUpdateModalOpen(true);
+  };
+
+  const handleCloseUpdateModal = () => {
+    setUpdateModalOpen(false);
+    setSelectedProductIdToUpdate(null);
+  };
+
+  const handleProductUpdated = () => {
+    fetchProducts();
+    setSnackbar({ open: true, message: 'Product updated successfully!', severity: 'success' });
+  };
+
+  const handleDisableProduct = async (product) => {
+    if (window.confirm(`Are you sure you want to disable ${product.name}?`)) {
+      try {
+        await productsApi.disable(product.id);
+        setSnackbar({ open: true, message: 'Product disabled successfully!', severity: 'success' });
+        fetchProducts();
+      } catch (err) {
+        setSnackbar({ open: true, message: err.message || 'Error disabling product', severity: 'error' });
+      }
+    }
   };
 
   const handlePrintBarcode = async (product, quantity) => {
@@ -282,15 +316,15 @@ const ProductsList = () => {
                     {isAdminUser && (
                       <TableCell align="right">
                         <Typography variant="body2">
-                          {product.cost_price
-                            ? formatCurrency(product.cost_price)
+                          {+product.cost_price
+                            ? formatCurrency(+product.cost_price)
                             : '-'}
                         </Typography>
                       </TableCell>
                     )}
                     <TableCell align="right">
                       <Typography variant="body2">
-                        {product.mrp ? formatCurrency(product.mrp) : '-'}
+                        {+product.mrp ? formatCurrency(+product.mrp) : '-'}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -299,7 +333,7 @@ const ProductsList = () => {
                         fontWeight={700}
                         color="primary"
                       >
-                        {formatCurrency(product.selling_price)}
+                        {formatCurrency(+product.selling_price)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -331,14 +365,22 @@ const ProductsList = () => {
                       <IconButton
                         size="small"
                         color="primary"
-                        onClick={() =>
-                          navigate(`/admin/products/edit/${product.id}`, {
-                            state: { fromPage: page },
-                          })
-                        }
+                        onClick={() => handleOpenUpdateModal(product.id)}
+                        sx={{ mr: 1 }}
+                        title="Edit Product"
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
+                      {(
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDisableProduct(product)}
+                          title="Disable Product"
+                        >
+                          <BlockIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -366,6 +408,14 @@ const ProductsList = () => {
         onClose={() => setPrintModalOpen(false)}
         product={selectedProductForPrint}
         onPrint={handlePrintBarcode}
+      />
+
+      {/* Update Product Modal */}
+      <UpdateProductModal
+        open={updateModalOpen}
+        onClose={handleCloseUpdateModal}
+        productId={selectedProductIdToUpdate}
+        onProductUpdated={handleProductUpdated}
       />
 
       {/* Feedback Snackbar */}

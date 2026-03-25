@@ -238,3 +238,38 @@ export const updateProduct = asyncHandler(async (req, res) => {
     }),
   );
 });
+
+export const disableProduct = asyncHandler(async (req, res) => {
+  const { product_id } = req.params;
+  const { user_id } = req.user;
+
+  const result = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      "UPDATE products SET is_active = false WHERE id = $1 RETURNING *",
+      [product_id],
+    );
+
+    if (!rows.length) {
+      throw createHttpError(404, "Product not found");
+    }
+
+    const updatedProduct = rows[0];
+
+    await logEvent(
+      client,
+      "PRODUCT_DISABLED",
+      user_id,
+      "PRODUCT",
+      product_id,
+    );
+
+    return updatedProduct;
+  });
+
+  res.status(200).json(
+    getSuccessResponse({
+      data: result,
+      message: "Product disabled successfully",
+    }),
+  );
+})
