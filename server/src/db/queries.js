@@ -1,12 +1,12 @@
 export const PRODUCT_QUERIES = {
   GET_ALL: (isAdmin, search, limit, offset) => {
     const isAdminField = isAdmin
-      ? ", s.cost_price, p.updated_at, p.updated_by, p.created_by, p.created_at"
+      ? ", s.cost_price, p.updated_at, p.updated_by, p.created_by"
       : "";
     return {
       text: `
         SELECT 
-          p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp,
+          p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp, p.is_active, p.created_at,
           s.stock_qty, lb.batch_no as latest_batch, lb.mrp ${isAdminField}
         FROM products p
         LEFT JOIN (
@@ -21,7 +21,8 @@ export const PRODUCT_QUERIES = {
           ORDER BY pb.created_at DESC
           LIMIT 1
         ) lb ON true
-        ${search ? `WHERE (p.name ILIKE $1 OR p.barcode ILIKE $1)` : ""}
+        WHERE p.is_active = true
+        ${search ? `AND (p.name ILIKE $1 OR p.barcode ILIKE $1)` : ""}
         ORDER BY p.created_at DESC
         LIMIT $${search ? 2 : 1} OFFSET $${search ? 3 : 2}
       `,
@@ -33,7 +34,8 @@ export const PRODUCT_QUERIES = {
       text: `
         SELECT COUNT(*)
         FROM products
-        ${search ? `WHERE (name ILIKE $1 OR barcode ILIKE $1)` : ""}
+        WHERE is_active = true
+        ${search ? `AND (name ILIKE $1 OR barcode ILIKE $1)` : ""}
       `,
       values: search ? [`%${search}%`] : [],
     };

@@ -107,6 +107,10 @@ export const productsApi = {
       method: 'PUT',
       body: JSON.stringify(productData),
     }),
+  disable: (id) =>
+    apiFetch(`/products/${id}/disable`, {
+      method: 'PATCH',
+    }),
 };
 
 export const stockApi = {

@@ -120,18 +120,21 @@ const ReturnBill = () => {
   };
 
   const handleManualQtyChange = (productId, value, max, saleType) => {
+    const numericMax = parseFloat(max) || 0;
+
     setReturnItems((prev) => {
       if (saleType === 'WEIGHT') {
-        if (value === '') return { ...prev, [productId]: '' };
-        if (!/^\d*\.?\d*$/.test(value)) return prev;
-        const numValue = parseFloat(value);
-        if (numValue > max) return { ...prev, [productId]: max };
-        return { ...prev, [productId]: value };
+        const normalized = value.replace(',', '.');
+        if (normalized === '') return { ...prev, [productId]: '' };
+        if (!/^\d*\.?\d*$/.test(normalized)) return prev;
+        const numValue = parseFloat(normalized);
+        if (numValue > numericMax) return { ...prev, [productId]: max };
+        return { ...prev, [productId]: normalized };
       } else {
         if (value === '') return { ...prev, [productId]: '' };
         const numValue = parseInt(value, 10);
         if (isNaN(numValue) || numValue < 0) return prev;
-        if (numValue > max) return { ...prev, [productId]: max };
+        if (numValue > numericMax) return { ...prev, [productId]: max };
         return { ...prev, [productId]: numValue };
       }
     });
