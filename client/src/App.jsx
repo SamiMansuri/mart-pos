@@ -9,7 +9,6 @@ import AdminDashboard from './pages/AdminDashboard';
 import BillHistory from './pages/BillHistory';
 import AddProduct from './pages/AddProduct';
 import ProductsList from './pages/ProductsList';
-import UpdateProduct from './pages/UpdateProduct';
 import CreateEmployee from './pages/CreateEmployee';
 import EmployeeList from './pages/EmployeeList';
 import ReturnBill from './pages/ReturnBill';
@@ -194,14 +193,7 @@ function App() {
               </RoleGuard>
             }
           />
-          <Route
-            path="admin/products/edit/:id"
-            element={
-              <RoleGuard allowedRoles={['cashier', 'admin']}>
-                <UpdateProduct />
-              </RoleGuard>
-            }
-          />
+
           <Route
             path="admin/stock"
             element={
