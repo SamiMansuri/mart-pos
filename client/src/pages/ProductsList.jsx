@@ -371,7 +371,7 @@ const ProductsList = () => {
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      {isAdminUser && (
+                      {(
                         <IconButton
                           size="small"
                           color="error"
