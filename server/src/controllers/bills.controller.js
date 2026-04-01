@@ -312,29 +312,43 @@ export const getBillById = asyncHandler(async (req, res) => {
   const { rows } = await pool.query(BILL_QUERIES.GET_BY_ID, [bill_id]);
   if (!rows.length) throw new Error("Bill not found");
 
-  const bill = {
-    bill_id: rows[0].bill_id,
-    bill_number: rows[0].bill_number,
-    total_amount: rows[0].total_amount,
-    payment_method: rows[0].payment_method,
-    created_at: rows[0].created_at,
-    invoice_number: rows[0].invoice_number,
-    items: rows.map((row) => ({
+  const result = rows.reduce((acc, row) => {
+    if (!acc) {
+      acc = {
+        bill_id: row.bill_id,
+        bill_number: row.bill_number,
+        total_amount: row.total_amount,
+        payment_method: row.payment_method,
+        created_at: row.created_at,
+        invoice_number: row.invoice_number,
+        customer_id: row.customer_id,
+        customer: {
+          name: row.customer_name,
+          phone: row.customer_phone,
+          total_due: row.customer_total_due
+        },
+        items: []
+      };
+    }
+
+    acc.items.push({
       item_id: row.item_id,
       product_id: row.product_id,
       product_name: row.snapshot_name || row.current_name,
-      product_barcode: row.product_barcode,
       quantity: row.quantity,
       price: row.price,
+      product_barcode: row.product_barcode,
       line_total: row.line_total,
       mrp: row.mrp,
       sale_type: row.sale_type,
-    })),
-  };
+    });
+
+    return acc;
+  }, null);
 
   res.json(
     getSuccessResponse({
-      data: bill,
+      data: result,
       message: "Bill fetched successfully",
       status: 200,
     }),
@@ -461,11 +475,34 @@ export const voidBill = asyncHandler(async (req, res) => {
 
 export const createReturn = asyncHandler(async (req, res) => {
   const { bill_id } = req.params;
-  const { items, reason, payment_method, idempotency_key } = req.body;
+  const {
+    items,
+    reason,
+    payment_method,
+    idempotency_key,
+    refund_required,
+    is_store_credit,
+    customer_id,
+  } = req.body;
   const { user_id } = req.user;
 
   if (!items?.length) {
     throw createHttpError(400, "No return items provided");
+  }
+
+  if (is_store_credit && !customer_id) {
+    throw createHttpError(400, "customer_id is required for store credit");
+  }
+
+  if (refund_required && is_store_credit) {
+    throw createHttpError(
+      400,
+      "Cannot request both refund and store credit for the same return",
+    );
+  }
+
+  if (refund_required && !payment_method) {
+    throw createHttpError(400, "payment_method is required for refunds");
   }
 
   const result = await withTransaction(async (client) => {
@@ -521,26 +558,58 @@ export const createReturn = asyncHandler(async (req, res) => {
       totalReturnAmount += billItems[0].price * item.quantity;
     }
 
-    const { refund_required } = req.body;
+    let customer = null;
+    if (is_store_credit) {
+      const { rows: custRows } = await client.query(
+        CUSTOMER_QUERIES.GET_CUSTOMER_BY_ID,
+        [customer_id],
+      );
+      if (!custRows.length) throw createHttpError(404, "Customer not found");
+      customer = custRows[0];
+    }
+
     const returnNumber = `RET-${Date.now()}`;
 
+    let returnRes;
+
     /** Create return */
-    const returnRes = await client.query(
-      `
+    if (is_store_credit) {
+      returnRes = await client.query(
+        `
+        INSERT INTO returns (bill_id, total_return_amount, reason, return_by, payment_method, idempotency_key, return_number, is_store_credit, customer_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *
+        `,
+        [
+          bill_id,
+          totalReturnAmount,
+          reason,
+          user_id,
+          payment_method,
+          idempotency_key,
+          returnNumber,
+          is_store_credit,
+          customer_id,
+        ],
+      );
+    } else {
+      returnRes = await client.query(
+        `
       INSERT INTO returns (bill_id, total_return_amount, reason, return_by, payment_method, idempotency_key, return_number)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
       `,
-      [
-        bill_id,
-        totalReturnAmount,
-        reason,
-        user_id,
-        payment_method,
-        idempotency_key,
-        returnNumber,
-      ],
-    );
+        [
+          bill_id,
+          totalReturnAmount,
+          reason,
+          user_id,
+          payment_method,
+          idempotency_key,
+          returnNumber,
+        ],
+      );
+    }
 
     const returnId = returnRes.rows[0].id;
     const reference = `RETURN-BILL-${bill.bill_number}`;
@@ -641,13 +710,49 @@ export const createReturn = asyncHandler(async (req, res) => {
     await logBillEvent({
       client,
       bill_id,
-      eventType: "RETURNED",
+      eventType: "RETURN_CREATED",
       performedBy: user_id,
       metadata: {
+        return_number: returnNumber,
         items: items,
-        refunded: refund_required,
+        refund_mode: is_store_credit ? "STORE_CREDIT" : refund_required ? payment_method : "NONE",
       },
     });
+
+    if (is_store_credit) {
+      const creditAmount = totalReturnAmount;
+
+      // 1. Decrease total_due (negative = store credit)
+      const { rows: updRows } = await client.query(
+        CUSTOMER_QUERIES.UPDATE_TOTAL_DUE,
+        [-creditAmount, customer_id],
+      );
+      const balanceAfter = parseFloat(updRows[0].total_due);
+
+      // 2. Write ledger entry — DEBIT = store owes customer
+      await client.query(CUSTOMER_QUERIES.INSERT_LEDGER_ENTRY, [
+        customer_id,
+        "DEBIT",
+        creditAmount,
+        balanceAfter,
+        bill_id,
+        `Return ${returnNumber}`,
+        user_id,
+      ]);
+
+      // 3. Dedicated bill event
+      await logBillEvent({
+        client,
+        bill_id,
+        eventType: "STORE_CREDIT_GIVEN",
+        performedBy: user_id,
+        metadata: {
+          return_number: returnNumber,
+          amount: creditAmount,
+          customer_id,
+        },
+      });
+    }
 
     return returnRes.rows[0];
   });
@@ -718,7 +823,7 @@ export const createRefund = asyncHandler(async (req, res) => {
     await logBillEvent({
       client,
       bill_id,
-      eventType: "REFUNDED",
+      eventType: "REFUND_ISSUED",
       performedBy: user_id,
       metadata: {
         amount: amount,
@@ -844,7 +949,11 @@ export const getBillsHistory = asyncHandler(async (req, res) => {
 
     // Get total count with filters
     const countRes = await client.query(
-      `SELECT COUNT(*) FROM bills ${whereClause}`,
+      `SELECT COUNT(*) FROM (
+        SELECT bill_number, created_at FROM bills
+        UNION ALL
+        SELECT return_number as bill_number, created_at FROM returns
+      ) combined ${whereClause}`,
       params,
     );
     const total = parseInt(countRes.rows[0].count);
@@ -852,8 +961,27 @@ export const getBillsHistory = asyncHandler(async (req, res) => {
 
     const billsRes = await client.query(
       `
-      SELECT *
-      FROM bills
+      SELECT * FROM (
+        SELECT 
+          'BILL' as entry_type,
+          id, bill_number, total_amount, payment_status, created_at, created_by, 
+          is_void, payment_method, round_adjustment, sub_total, customer_id, returned_amount,
+          NULL::int as original_bill_id,
+          NULL::text as original_bill_number
+        FROM bills
+        UNION ALL
+        SELECT 
+          'RETURN' as entry_type,
+          r.id, r.return_number as bill_number, -r.total_return_amount as total_amount, 
+          CASE WHEN r.is_store_credit THEN 'STORE_CREDIT' ELSE 'REFUNDED' END as payment_status,
+          r.created_at, r.return_by as created_by,
+          false as is_void, r.payment_method, 0 as round_adjustment, 
+          -r.total_return_amount as sub_total, b.customer_id, 0 as returned_amount,
+          r.bill_id as original_bill_id,
+          b.bill_number as original_bill_number
+        FROM returns r
+        JOIN bills b ON b.id = r.bill_id
+      ) combined
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
