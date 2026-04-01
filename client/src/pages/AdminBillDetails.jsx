@@ -260,9 +260,18 @@ const AdminBillDetails = () => {
                   }}
                 >
                   <Box>
-                    <Typography variant="subtitle2" fontWeight={700}>
-                      Return #{ret.return_number || ret.id}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        {ret.return_number || `Return #${ret.id}`}
+                      </Typography>
+                      <Chip
+                        label={ret.is_store_credit ? 'STORE CREDIT' : `via ${ret.payment_method || 'CASH'}`}
+                        color={ret.is_store_credit ? 'info' : 'default'}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.65rem', fontWeight: 700 }}
+                      />
+                    </Box>
                     <Typography variant="caption" color="text.secondary">
                       {new Date(ret.created_at).toLocaleString()} by{' '}
                       {ret.return_by_name}
