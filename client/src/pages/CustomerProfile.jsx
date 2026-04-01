@@ -26,6 +26,7 @@ import {
   Card,
   CardContent,
   Divider,
+  Tooltip,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -34,7 +35,9 @@ import {
   CreditCard as CreditCardIcon,
   Description as DescriptionIcon,
   AccountBalanceWallet as WalletIcon,
+  MoreVert as MoreIcon,
 } from '@mui/icons-material';
+import { Menu, MenuItem } from '@mui/material';
 import { customersApi, paymentsApi, billsApi } from '../api/api';
 
 const CustomerProfile = () => {
@@ -53,6 +56,12 @@ const CustomerProfile = () => {
     amount: '',
     note: '',
   });
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedBill, setSelectedBill] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editValue, setEditValue] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchCustomerData();
@@ -107,6 +116,73 @@ const CustomerProfile = () => {
       setError(err.message || 'Failed to record payment');
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  const handleMenuOpen = (event, bill) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedBill(bill);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setSelectedBill(null);
+  };
+
+  const handleEditOpen = () => {
+    if (selectedBill) {
+      setEditValue(selectedBill.round_adjustment || 0);
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleEditClose = () => {
+    setEditDialogOpen(false);
+    setEditValue(0);
+  };
+
+  const handleEditSave = async () => {
+    try {
+      setSaving(true);
+      await billsApi.editBill(selectedBill.id, {
+        round_adjustment: parseFloat(editValue),
+      });
+      setEditDialogOpen(false);
+      fetchCustomerData();
+    } catch (err) {
+      alert(err.message || 'Failed to update bill');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleVoid = async () => {
+    if (!selectedBill) return;
+    if (!window.confirm(`Void transaction ${selectedBill.bill_number}?`)) {
+      handleMenuClose();
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await billsApi.void(selectedBill.id);
+      fetchCustomerData();
+    } catch (err) {
+      alert(err.message || 'Failed to void transaction');
+    } finally {
+      setSaving(false);
+      handleMenuClose();
+    }
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'PAID': return 'success';
+      case 'PARTIAL': return 'warning';
+      case 'UNPAID': return 'error';
+      case 'REFUNDED': return 'secondary';
+      case 'STORE_CREDIT': return 'info';
+      default: return 'default';
     }
   };
 
@@ -323,12 +399,16 @@ const CustomerProfile = () => {
               bgcolor:
                 parseFloat(customer.total_due) > 0
                   ? 'error.light'
-                  : 'success.light',
+                  : parseFloat(customer.total_due) < 0
+                    ? 'info.light'
+                    : 'success.light',
               color: 'white',
               boxShadow:
                 parseFloat(customer.total_due) > 0
                   ? '0 8px 24px rgba(211,47,47,0.3)'
-                  : '0 8px 24px rgba(46,125,50,0.3)',
+                  : parseFloat(customer.total_due) < 0
+                    ? '0 8px 24px rgba(2,136,209,0.3)'
+                    : '0 8px 24px rgba(46,125,50,0.3)',
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -365,14 +445,18 @@ const CustomerProfile = () => {
                   letterSpacing: 1,
                 }}
               >
-                Total Due
+                {parseFloat(customer.total_due) > 0
+                  ? 'Total Due'
+                  : parseFloat(customer.total_due) < 0
+                    ? 'Store Credit'
+                    : 'Settled'}
               </Typography>
               <Typography
                 variant="h2"
                 fontWeight={900}
                 sx={{ my: 2, textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
               >
-                ₹{parseFloat(customer.total_due).toFixed(2)}
+                ₹{Math.abs(parseFloat(customer.total_due)).toFixed(2)}
               </Typography>
 
               <Button
@@ -522,21 +606,21 @@ const CustomerProfile = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Bill #</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Payment</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Paid
-              </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Total
-              </TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Bill/Return #</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Subtotal</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Round Adjust</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Total Amount</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Payment Status</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Time</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {bills.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
                   <Typography variant="body2" color="text.secondary">
                     No bills found for this customer.
                   </Typography>
@@ -545,8 +629,87 @@ const CustomerProfile = () => {
             ) : (
               bills.map((bill) => (
                 <TableRow key={bill.id} hover>
-                  <TableCell sx={{ fontWeight: 600 }}>
-                    {bill.bill_number}
+                  <TableCell>
+                    <Chip
+                      label={bill.entry_type}
+                      size="small"
+                      color={bill.entry_type === 'RETURN' ? 'secondary' : 'primary'}
+                      variant="outlined"
+                      sx={{ fontWeight: 700, fontSize: '0.6rem' }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={600}>
+                      {bill.bill_number}
+                    </Typography>
+                    {bill.entry_type === 'RETURN' && bill.original_bill_number && (
+                      <Tooltip title="View original bill">
+                        <Typography
+                          variant="caption"
+                          color="secondary"
+                          sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                          onClick={() => navigate(`/admin/bills/${bill.original_bill_id}`)}
+                        >
+                          ↩ Against: {bill.original_bill_number}
+                        </Typography>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    ₹{parseFloat(bill.sub_total || 0).toFixed(2)}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      color:
+                        bill.round_adjustment < 0 ? 'error.main' : 'inherit',
+                    }}
+                  >
+                    ₹{parseFloat(bill.round_adjustment || 0).toFixed(2)}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: bill.entry_type === 'RETURN' ? 'secondary.main' : 'inherit' }}>
+                    ₹{parseFloat(bill.total_amount).toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={bill.payment_status || 'PAID'}
+                      color={getPaymentStatusColor(bill.payment_status)}
+                      size="small"
+                      sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {bill.entry_type === 'RETURN' ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Chip
+                          label="RETURN"
+                          color="secondary"
+                          size="small"
+                          sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+                        />
+                        {bill.payment_method && (
+                          <Chip
+                            label={`via ${bill.payment_method}`}
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: '0.6rem' }}
+                          />
+                        )}
+                      </Box>
+                    ) : bill.is_void ? (
+                      <Chip
+                        label="VOID"
+                        color="error"
+                        size="small"
+                        sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+                      />
+                    ) : (
+                      <Chip
+                        label="ACTIVE"
+                        color="success"
+                        size="small"
+                        sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     {new Intl.DateTimeFormat('en-IN', {
@@ -556,17 +719,12 @@ const CustomerProfile = () => {
                     }).format(new Date(bill.created_at))}
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={bill.payment_method}
+                    <IconButton
                       size="small"
-                      sx={{ fontWeight: 700, fontSize: '0.7rem' }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    ₹{parseFloat(bill.paid_amount || 0).toFixed(2)}
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 800 }}>
-                    ₹{parseFloat(bill.total_amount).toFixed(2)}
+                      onClick={(e) => handleMenuOpen(e, bill)}
+                    >
+                      <MoreIcon />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))
@@ -676,10 +834,10 @@ const CustomerProfile = () => {
                   ₹
                   {customer
                     ? Math.max(
-                        0,
-                        parseFloat(customer.total_due) -
-                          parseFloat(paymentData.amount || 0),
-                      ).toFixed(2)
+                      0,
+                      parseFloat(customer.total_due) -
+                      parseFloat(paymentData.amount || 0),
+                    ).toFixed(2)
                     : '0.00'}
                 </Typography>
               </Box>
@@ -764,6 +922,106 @@ const CustomerProfile = () => {
             ) : (
               'Confirm Payment'
             )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bill Action Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={handleEditOpen}>Edit Bill</MenuItem>
+        <MenuItem
+          onClick={() => {
+            navigate('/cashier/return', {
+              state: { bill_number: selectedBill?.bill_number },
+            });
+            handleMenuClose();
+          }}
+        >
+          Return Sale
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            navigate(`/bill-view/${selectedBill?.id}`);
+            handleMenuClose();
+          }}
+        >
+          View Receipt
+        </MenuItem>
+        {selectedBill && !selectedBill.is_void && (
+          <MenuItem onClick={handleVoid} sx={{ color: 'error.main' }}>
+            Void Transaction
+          </MenuItem>
+        )}
+      </Menu>
+
+      {/* Edit Bill Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => {
+          handleEditClose();
+          handleMenuClose();
+        }}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          Edit Bill - {selectedBill?.bill_number}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom fontWeight={600}>
+              Subtotal: ₹{parseFloat(selectedBill?.sub_total || 0).toFixed(2)}
+            </Typography>
+            <TextField
+              fullWidth
+              autoFocus
+              label="Round Adjustment"
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              sx={{ mt: 2 }}
+              InputProps={{
+                sx: { borderRadius: 2, fontWeight: 700 }
+              }}
+            />
+            <Typography variant="h6" sx={{ mt: 3, fontWeight: 900, color: 'primary.main' }}>
+              New Total: ₹
+              {(
+                Number(selectedBill?.sub_total || 0) -
+                Number(editValue || 0)
+              ).toFixed(2)}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 1 }}>
+          <Button
+            onClick={() => {
+              handleEditClose();
+              handleMenuClose();
+            }}
+            disabled={saving}
+            sx={{ fontWeight: 700 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              handleEditSave();
+              handleMenuClose();
+            }}
+            variant="contained"
+            disabled={saving}
+            sx={{ fontWeight: 800, px: 3, borderRadius: 2 }}
+          >
+            {saving ? <CircularProgress size={24} /> : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
