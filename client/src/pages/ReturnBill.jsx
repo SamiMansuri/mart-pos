@@ -26,14 +26,17 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Autocomplete,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   ArrowBack as BackIcon,
   RemoveCircleOutline as RemoveIcon,
   AddCircleOutline as AddIcon,
+  PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
-import { billsApi } from '../api/api';
+import { billsApi, customersApi } from '../api/api';
+import AddCustomerModal from '../components/AddCustomerModal';
 
 const ReturnBill = () => {
   const navigate = useNavigate();
@@ -51,7 +54,32 @@ const ReturnBill = () => {
   const [refundRequired, setRefundRequired] = useState('WITH_REFUND');
   const [refundMethod, setRefundMethod] = useState('CASH');
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [customerChooserOpen, setCustomerChooserOpen] = useState(false);
+  const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const [selectedCustomerToAdd, setSelectedCustomerToAdd] = useState(null);
   const location = useLocation();
+
+  const handleCustomerSearch = async (query) => {
+    setCustomerSearchLoading(true);
+    try {
+      const res = await customersApi.getAll(query);
+      console.log(res);
+      setCustomerOptions(res || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCustomerSearchLoading(false);
+    }
+  };
+
+  // Preload some customers
+  useEffect(() => {
+    if (customerChooserOpen) {
+      handleCustomerSearch('');
+    }
+  }, [customerChooserOpen]);
 
   const fetchBill = useCallback(async (forcedParams = null) => {
     setLoading(true);
@@ -166,6 +194,8 @@ const ReturnBill = () => {
         payment_method: refundMethod,
         idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         refund_required: refundRequired === 'WITH_REFUND',
+        is_store_credit: refundRequired === 'NO_REFUND',
+        customer_id: bill.customer_id,
       });
 
       // Navigate back or show success
@@ -181,16 +211,16 @@ const ReturnBill = () => {
 
   return (
     <Box>
-      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <IconButton onClick={() => navigate('/cashier')}>
           <BackIcon />
         </IconButton>
         <Typography variant="h4" fontWeight={700}>
-          Process Return
+          Return Sales
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 4, mb: 4 }}>
+      <Paper sx={{ p: 4 }}>
         <Typography variant="h6" gutterBottom fontWeight={600}>
           Search Bill
         </Typography>
@@ -402,6 +432,26 @@ const ReturnBill = () => {
           </Grid>
 
           <Grid item xs={12} lg={4}>
+            {bill.customer?.name && (
+              <Paper sx={{ px: 4, position: 'sticky', top: 20 }}>
+                <Box
+                  sx={{ display: 'flex', gap: 1 }}
+                >
+                  <Typography variant="body1">Customer:</Typography>
+                  <Typography variant="h6" color="primary" fontWeight={700}>
+                    {bill.customer ? `${bill.customer.name} ${bill.customer.phone ? `(${bill.customer.phone})` : ''}` : 'Anonymous'}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{ display: 'flex', gap: 1 }}
+                >
+                  <Typography variant="body1">Total Due:</Typography>
+                  <Typography variant="h6" color="primary" fontWeight={700}>
+                    ₹{bill.customer ? bill.customer.total_due : '0.00'}
+                  </Typography>
+                </Box>
+              </Paper>
+            )}
             <Paper sx={{ p: 4, position: 'sticky', top: 20 }}>
               <Typography variant="h6" gutterBottom fontWeight={700}>
                 Return Summary
@@ -409,9 +459,18 @@ const ReturnBill = () => {
               <Divider sx={{ my: 2 }} />
 
               <Box
+                sx={{ display: 'flex', justifyContent: 'space-between' }}
+              >
+                <Typography variant="body1">Sub Total</Typography>
+                <Typography variant="h6" color="primary" fontWeight={700}>
+                  ₹{bill.total_amount}
+                </Typography>
+              </Box>
+
+              <Box
                 sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}
               >
-                <Typography variant="body1">Total Return Amount</Typography>
+                <Typography variant="body1">Total Return</Typography>
                 <Typography variant="h6" color="primary" fontWeight={700}>
                   ₹{totalReturnAmount.toFixed(2)}
                 </Typography>
@@ -423,17 +482,23 @@ const ReturnBill = () => {
                 </Typography>
                 <RadioGroup
                   value={refundRequired}
-                  onChange={(e) => setRefundRequired(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value === 'NO_REFUND' && !bill.customer_id) {
+                      setCustomerChooserOpen(true);
+                    } else {
+                      setRefundRequired(e.target.value);
+                    }
+                  }}
                 >
                   <FormControlLabel
                     value="WITH_REFUND"
                     control={<Radio size="small" />}
-                    label="Return with Refund"
+                    label="Refund"
                   />
                   <FormControlLabel
                     value="NO_REFUND"
                     control={<Radio size="small" />}
-                    label="Return Only (No Refund)"
+                    label="Keep as Store Credit"
                   />
                 </RadioGroup>
               </Box>
@@ -495,8 +560,8 @@ const ReturnBill = () => {
               A refund will be issued via {refundMethod}.
             </Typography>
           ) : (
-            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-              No refund will be issued for this return.
+            <Typography variant="body2" sx={{ mt: 1, color: 'success.main', fontWeight: 600 }}>
+              The amount will be added as store credit for {bill.customer?.name}.
             </Typography>
           )}
         </DialogContent>
@@ -509,6 +574,98 @@ const ReturnBill = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Customer Chooser Dialog for Store Credit */}
+      <Dialog
+        open={customerChooserOpen}
+        onClose={() => setCustomerChooserOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Assign to Customer</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Store credit requires a customer profile. Please select an existing customer or create a new one.
+          </Typography>
+
+          <Autocomplete
+            options={customerOptions}
+            getOptionLabel={(option) => `${option.name} ${option.phone ? `(${option.phone})` : ''}`}
+            loading={customerSearchLoading}
+            onChange={(event, newValue) => {
+              setSelectedCustomerToAdd(newValue);
+            }}
+            onInputChange={(event, newInputValue) => {
+              handleCustomerSearch(newInputValue);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Search Existing Customer"
+                variant="outlined"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <React.Fragment>
+                      {customerSearchLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </React.Fragment>
+                  ),
+                }}
+              />
+            )}
+            sx={{ mb: 3 }}
+          />
+
+          <Divider sx={{ my: 3 }}>OR</Divider>
+
+          <Button
+            variant="outlined"
+            fullWidth
+            size="large"
+            startIcon={<PersonAddIcon />}
+            onClick={() => {
+              setCustomerChooserOpen(false);
+              setAddCustomerModalOpen(true);
+            }}
+          >
+            Create New Customer
+          </Button>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setCustomerChooserOpen(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!selectedCustomerToAdd}
+            onClick={() => {
+              setBill((prev) => ({
+                ...prev,
+                customer_id: selectedCustomerToAdd.id,
+                customer: selectedCustomerToAdd,
+              }));
+              setRefundRequired('NO_REFUND');
+              setCustomerChooserOpen(false);
+            }}
+          >
+            Assign & Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <AddCustomerModal
+        open={addCustomerModalOpen}
+        onClose={() => setAddCustomerModalOpen(false)}
+        onSuccess={(newCustomer) => {
+          setBill((prev) => ({
+            ...prev,
+            customer_id: newCustomer.id,
+            customer: newCustomer,
+          }));
+          setRefundRequired('NO_REFUND');
+        }}
+      />
     </Box>
   );
 };

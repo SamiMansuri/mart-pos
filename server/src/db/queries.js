@@ -181,10 +181,15 @@ export const BILL_QUERIES = {
        p.id AS product_id,
        p.name AS current_name,
        p.barcode AS product_barcode,
-       p.sale_type
+       p.sale_type,
+       c.name AS customer_name,
+       c.phone AS customer_phone,
+       c.total_due as customer_total_due,
+       b.customer_id as customer_id
      FROM bills b
      JOIN bill_items bi ON bi.bill_id = b.id
      JOIN products p ON p.id = bi.product_id
+     LEFT JOIN customers c on c.id = b.customer_id
      WHERE b.id = $1 ORDER BY bi.id ASC`,
   CREATE_CREDIT: `
     INSERT INTO bills (
@@ -197,13 +202,38 @@ export const BILL_QUERIES = {
     RETURNING *
   `,
   GET_BY_CUSTOMER_PAGINATED: `
-    SELECT * FROM bills 
-    WHERE customer_id = $1 
+    SELECT * FROM (
+      SELECT 
+        'BILL' as entry_type,
+        id, bill_number, total_amount, payment_status, created_at, created_by, 
+        is_void, payment_method, round_adjustment, sub_total, customer_id, returned_amount,
+        NULL::int as original_bill_id,
+        NULL::text as original_bill_number
+      FROM bills 
+      WHERE customer_id = $1
+      UNION ALL
+      SELECT 
+        'RETURN' as entry_type,
+        r.id, r.return_number as bill_number, -r.total_return_amount as total_amount, 
+        CASE WHEN r.is_store_credit THEN 'STORE_CREDIT' ELSE 'REFUNDED' END as payment_status,
+        r.created_at, r.return_by as created_by,
+        false as is_void, r.payment_method, 0 as round_adjustment, 
+        -r.total_return_amount as sub_total, r.customer_id, 0 as returned_amount,
+        r.bill_id as original_bill_id,
+        b.bill_number as original_bill_number
+      FROM returns r
+      JOIN bills b ON b.id = r.bill_id
+      WHERE r.customer_id = $1
+    ) combined
     ORDER BY created_at DESC 
     LIMIT $2 OFFSET $3
   `,
   COUNT_BY_CUSTOMER: `
-    SELECT COUNT(*) FROM bills WHERE customer_id = $1
+    SELECT (
+      SELECT COUNT(*) FROM bills WHERE customer_id = $1
+    ) + (
+      SELECT COUNT(*) FROM returns WHERE customer_id = $1
+    ) as count
   `,
 };
 
