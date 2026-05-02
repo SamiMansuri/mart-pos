@@ -121,6 +121,30 @@ export const stockApi = {
     }),
 };
 
+export const luckyDrawApi = {
+  getActiveCampaign: () => apiFetch('/lucky-draw/campaigns/active'),
+  createCampaign: (data) =>
+    apiFetch('/lucky-draw/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateCampaign: (id, data) =>
+    apiFetch(`/lucky-draw/campaigns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  getExcludedProducts: (id) =>
+    apiFetch(`/lucky-draw/campaigns/${id}/excluded-products`),
+  addExcludedProduct: (id, productId) =>
+    apiFetch(`/lucky-draw/campaigns/${id}/excluded-products/${productId}`, {
+      method: 'POST',
+    }),
+  removeExcludedProduct: (id, productId) =>
+    apiFetch(`/lucky-draw/campaigns/${id}/excluded-products/${productId}`, {
+      method: 'DELETE',
+    }),
+};
+
 export const authApi = {
   login: (credentials) =>
     apiFetch('/auth/login', {
@@ -163,6 +187,11 @@ export const customersApi = {
     apiFetch(`/customers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(customerData),
+    }),
+  updatePartial: (id, data) =>
+    apiFetch(`/customers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
   getLedger: (id, page, limit) => {
     let url = `/customers/${id}/ledger`;
