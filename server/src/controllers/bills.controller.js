@@ -396,9 +396,9 @@ export const getBillById = asyncHandler(async (req, res) => {
         customer: {
           name: row.customer_name,
           phone: row.customer_phone,
-          total_due: row.customer_total_due,
+          total_due: row.customer_total_due
         },
-        items: [],
+        items: []
       };
     }
 
@@ -786,11 +786,7 @@ export const createReturn = asyncHandler(async (req, res) => {
       metadata: {
         return_number: returnNumber,
         items: items,
-        refund_mode: is_store_credit
-          ? "STORE_CREDIT"
-          : refund_required
-            ? payment_method
-            : "NONE",
+        refund_mode: is_store_credit ? "STORE_CREDIT" : refund_required ? payment_method : "NONE",
       },
     });
 
