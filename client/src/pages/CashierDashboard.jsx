@@ -354,8 +354,9 @@ const CashierDashboard = () => {
             const excluded = await luckyDrawApi.getExcludedProducts(
               campaign.id,
             );
+            console.log('excluded==>', excluded);
             setExcludedProductIds(
-              new Set((excluded || []).map((p) => p.product_id)),
+              new Set((excluded?.excluded_products || []).map((p) => p.product_id)),
             );
           } catch {
             // Non-fatal: proceed with empty exclusion set
@@ -422,9 +423,17 @@ const CashierDashboard = () => {
   // Lucky Draw — eligible amount excludes excluded products and round adjustment
   const eligibleAmount =
     cart.reduce((sum, item) => {
+      console.log('item.id==>', item.id);
+      console.log('excludedProductIds==>', excludedProductIds);
+      console.log(
+        'excludedProductIds.has(item.id)==>',
+        excludedProductIds.has(item.id),
+      );
       if (excludedProductIds.has(item.id)) return sum;
       return sum + item.selling_price * (parseFloat(item.quantity) || 0);
     }, 0) - Number(roundAdjust || 0);
+
+  console.log('eligibleAmount==>', eligibleAmount);
 
   const printBill = async (
     cartItems,
@@ -546,7 +555,7 @@ const CashierDashboard = () => {
 
 Thank you for shopping at Family Super Mart!
 
-You have successfully entered our ${campaign_name}.
+You have successfully entered our Mega Lucky Draw 2026.
 Your Ticket Number(s): ${ticket_numbers.join(', ')}
 Draw Date: After 15th August 2026
 

@@ -61,21 +61,17 @@ const LuckyDrawAdmin = () => {
     try {
       setLoading(true);
       const data = await luckyDrawApi.getActiveCampaign();
-      if (data?.campaign) {
-        setCampaignId(data.campaign.id);
+      if (data) {
+        setCampaignId(data.id);
         setFormData({
-          name: data.campaign.name || '',
-          prefix: data.campaign.prefix || '',
-          min_bill_amount: data.campaign.min_bill_amount || 2500,
-          start_date: data.campaign.start_date
-            ? data.campaign.start_date.split('T')[0]
-            : '',
-          draw_date: data.campaign.draw_date
-            ? data.campaign.draw_date.split('T')[0]
-            : '',
-          status: data.campaign.status || 'inactive',
+          name: data.name || '',
+          prefix: data.prefix || '',
+          min_bill_amount: data.min_bill_amount || 2500,
+          start_date: data.start_date ? data.start_date.split('T')[0] : '',
+          draw_date: data.draw_date ? data.draw_date.split('T')[0] : '',
+          status: data.status || 'inactive',
         });
-        fetchExcludedProducts(data.campaign.id);
+        fetchExcludedProducts(data.id);
       }
     } catch (err) {
       if (err?.status !== 404 && err?.message !== 'No active campaign found.') {

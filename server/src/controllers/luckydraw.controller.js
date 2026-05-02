@@ -52,9 +52,7 @@ export const createCampaign = asyncHandler(async (req, res) => {
 });
 
 export const getActiveCampaign = asyncHandler(async (req, res) => {
-  const result = await pool.query(
-    `SELECT * FROM lucky_draw_campaigns WHERE status = 'active' LIMIT 1`,
-  );
+  const result = await pool.query(`SELECT * FROM lucky_draw_campaigns LIMIT 1`);
 
   if (result.rows.length === 0) {
     throw createHttpError(404, "No active campaign found.");
