@@ -32,6 +32,7 @@ import {
   Lock as LockIcon,
   MoreVert as MoreIcon,
   Contacts as ContactsIcon,
+  CardGiftcard as GiftIcon,
 } from '@mui/icons-material';
 import { isAdmin, isCashier, getUserInfo } from '../utils/auth.utils';
 import { authApi } from '../api/api';
@@ -72,6 +73,8 @@ const Layout = () => {
     if (location.pathname.startsWith('/admin/users')) return '/admin/users';
     if (location.pathname.startsWith('/admin/products'))
       return '/admin/products';
+    if (location.pathname.startsWith('/admin/lucky-draw'))
+      return '/admin/lucky-draw';
     if (location.pathname.startsWith('/admin')) return '/admin';
     if (location.pathname === '/cashier/report') return '/cashier/report';
     if (location.pathname.startsWith('/cashier')) return '/cashier';
@@ -85,24 +88,24 @@ const Layout = () => {
   const menuItems = [
     ...(showAdminTab
       ? [
-        { text: 'Dashboard', icon: <AdminIcon />, path: '/admin' },
-        {
-          text: 'Inventory',
-          icon: <InventoryIcon />,
-          path: '/admin/products',
-        },
-        { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
-        { text: 'Employees', icon: <PeopleIcon />, path: '/admin/users' },
-      ]
+          { text: 'Dashboard', icon: <AdminIcon />, path: '/admin' },
+          {
+            text: 'Inventory',
+            icon: <InventoryIcon />,
+            path: '/admin/products',
+          },
+          { text: 'Lucky Draw', icon: <GiftIcon />, path: '/admin/lucky-draw' },
+          { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
+        ]
       : []),
     ...(isCashierUser
       ? [
-        {
-          text: 'Inventory',
-          icon: <InventoryIcon />,
-          path: '/admin/products',
-        },
-      ]
+          {
+            text: 'Inventory',
+            icon: <InventoryIcon />,
+            path: '/admin/products',
+          },
+        ]
       : []),
     { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
     { text: 'Cashier Report', icon: <ReportsIcon />, path: '/cashier/report' },
@@ -191,6 +194,20 @@ const Layout = () => {
       </List>
       <Divider />
       <List>
+        {showAdminTab && (
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/admin/users"
+              selected={getCurrentTab() === '/admin/users'}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <PeopleIcon />
+              </ListItemIcon>
+              <ListItemText primary="Employees" />
+            </ListItemButton>
+          </ListItem>
+        )}
         <ListItem disablePadding>
           <ListItemButton
             component={Link}
@@ -305,6 +322,20 @@ const Layout = () => {
                 </Typography>
               </Box>
               <Divider />
+              {showAdminTab && (
+                <MenuItem
+                  onClick={() => {
+                    handleMenuClose();
+                    navigate('/admin/users');
+                  }}
+                  sx={{ py: 1.5 }}
+                >
+                  <ListItemIcon>
+                    <PeopleIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Employees" />
+                </MenuItem>
+              )}
               <MenuItem
                 onClick={() => {
                   handleMenuClose();

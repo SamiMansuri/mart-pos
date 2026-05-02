@@ -22,6 +22,7 @@ import CustomersList from './pages/CustomersList';
 import CustomerProfile from './pages/CustomerProfile';
 import CustomerLedgerAll from './pages/CustomerLedgerAll';
 import CustomerBillsAll from './pages/CustomerBillsAll';
+import LuckyDrawAdmin from './pages/LuckyDrawAdmin';
 import { getUserInfo, isTokenExpired } from './utils/auth.utils';
 
 // Guard for authenticated sessions
@@ -199,6 +200,14 @@ function App() {
             element={
               <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <StockEntry />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/lucky-draw"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <LuckyDrawAdmin />
               </RoleGuard>
             }
           />

@@ -17,6 +17,7 @@ router.post("/", createCustomer);
 router.get("/", getCustomers); // ?q=search term
 router.get("/:id", getCustomerById);
 router.put("/:id", updateCustomer);
+router.patch("/:id", updateCustomer);
 router.post("/:id/payments", recordPayment);
 router.get("/:id/ledger", getCustomerLedger);
 

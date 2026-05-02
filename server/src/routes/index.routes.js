@@ -6,6 +6,7 @@ import authRouter from "./auth.routes.js";
 import reportsRouter from "./reports.routes.js";
 import stockRouter from "./stock.routes.js";
 import customersRouter from "./customer.routes.js";
+import luckyDrawRouter from "./luckydraw.routes.js";
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use("/auth", authRouter);
 router.use("/reports", reportsRouter);
 router.use("/stock", stockRouter);
 router.use("/customers", customersRouter);
+router.use("/lucky-draw", luckyDrawRouter);
 
 export default router;

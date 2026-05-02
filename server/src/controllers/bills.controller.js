@@ -16,6 +16,12 @@ import {
   STOCK_QUERIES,
   CUSTOMER_QUERIES,
 } from "../db/queries.js";
+import { generateLuckyDrawEntries } from "../services/luckydraw.service.js";
+import {
+  openWhatsApp,
+  sendLuckyDraw,
+  sendReceipt,
+} from "../services/whatsapp.service.js";
 
 export const createBill = asyncHandler(async (req, res) => {
   const {
@@ -27,6 +33,7 @@ export const createBill = asyncHandler(async (req, res) => {
     is_credit = false,
     customer_id = null,
     paid_amount = null,
+    participate_in_lucky_draw = false,
   } = req.body;
   const { user_id } = req.user;
 
@@ -48,6 +55,8 @@ export const createBill = asyncHandler(async (req, res) => {
       );
   }
   const normalizedItems = normalizeItems(items);
+  const productMap = new Map();
+  let customer = null;
 
   const result = await withTransaction(async (client) => {
     const existingBill = await client.query(BILL_QUERIES.CHECK_IDEMPOTENCY, [
@@ -58,7 +67,6 @@ export const createBill = asyncHandler(async (req, res) => {
       return { isNew: false, bill: existingBill.rows[0] };
     }
 
-    let customer = null;
     if (is_credit) {
       const { rows: custRows } = await client.query(
         CUSTOMER_QUERIES.GET_CUSTOMER_BY_ID,
@@ -69,8 +77,6 @@ export const createBill = asyncHandler(async (req, res) => {
     }
 
     let subTotal = 0;
-
-    const productMap = new Map();
 
     for (const item of normalizedItems) {
       if (item.quantity <= 0) {
@@ -291,8 +297,73 @@ export const createBill = asyncHandler(async (req, res) => {
 
   const { isNew, bill } = result;
 
+  let luckyDrawResult = null;
+
+  console.log("normalizedItems==>", normalizedItems);
+  console.log("productMap==>", productMap);
+  // console.log("customer==>", customer);
+
+  // await sendReceipt("9484443735", {
+  //   invoiceNo: bill.invoice_number,
+  //   total: parseFloat(bill.total_amount),
+  //   customerName: "xyz",
+  // }).catch((err) => console.error("[WhatsApp] Receipt failed:", err));
+
+  if (isNew && customer_id && participate_in_lucky_draw) {
+    // Pass normalizedItems and productMap — already built in the transaction above.
+    // generateLuckyDrawEntries reuses productMap so no extra DB calls are made.
+    luckyDrawResult = await generateLuckyDrawEntries({
+      billId: bill.bill_number,
+      items: normalizedItems,
+      productMap,
+      customerId: customer_id,
+      roundAdjustment: Number(round_adjustment || 0),
+    });
+
+    if (luckyDrawResult.generated) {
+      console.log(
+        `[LuckyDraw] Bill ${bill.id} — entries generated:`,
+        luckyDrawResult.ticketNumbers,
+      );
+      // TODO: Add WhatsApp notification here when ready
+      // sendLuckyDrawWhatsApp(luckyDrawResult);
+
+      if (luckyDrawResult?.customerPhone && luckyDrawResult?.generated) {
+        // openWhatsApp(luckyDrawResult?.customerPhone, {
+        //   customerName: luckyDrawResult?.customerName,
+        //   ticketNumbers: luckyDrawResult.ticketNumbers,
+        //   drawDate: luckyDrawResult.drawDate,
+        // });
+        // sendLuckyDraw(luckyDrawResult?.customerPhone, {
+        //   customerName: luckyDrawResult?.customerName,
+        //   ticketNumbers: luckyDrawResult.ticketNumbers,
+        //   drawDate: luckyDrawResult.drawDate,
+        // }).catch((err) =>
+        //   console.error("[WhatsApp] Lucky draw failed:", err.response),
+        // );
+      }
+    } else {
+      console.log(
+        `[LuckyDraw] Bill ${bill.id} — skipped: ${luckyDrawResult.reason}`,
+      );
+    }
+  }
+
+  console.log("luckyDrawResult==>", luckyDrawResult);
+
   const response = {
-    data: bill,
+    data: {
+      ...bill,
+      lucky_draw: luckyDrawResult?.generated
+        ? {
+            ticket_numbers: luckyDrawResult.ticketNumbers,
+            entry_count: luckyDrawResult.entryCount,
+            eligible_amount: luckyDrawResult.eligibleAmount,
+            campaign_name: luckyDrawResult.campaignName,
+            draw_date: luckyDrawResult.drawDate,
+          }
+        : null,
+    },
     message: isNew ? "Bill created successfully" : "Bill already exists",
     status: isNew ? 201 : 200,
   };

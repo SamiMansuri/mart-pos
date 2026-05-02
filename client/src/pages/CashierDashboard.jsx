@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { productsApi, billsApi, customersApi } from '../api/api';
+import { productsApi, billsApi, customersApi, luckyDrawApi } from '../api/api';
 import {
   Box,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
   Typography,
   Button,
   Paper,
@@ -16,11 +12,6 @@ import {
   CircularProgress,
   TextField,
   InputAdornment,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   ToggleButtonGroup,
   ToggleButton,
   Table,
@@ -30,8 +21,6 @@ import {
   TableHead,
   TableRow,
   Autocomplete,
-  Popper,
-  List,
   ListItem,
   ListItemText,
   FormControlLabel,
@@ -66,14 +55,24 @@ const CashierDashboard = () => {
   const [roundAdjust, setRoundAdjust] = useState(0);
   const qtyRefs = useRef([]);
 
-  // Credit Bill State
-  const [isCredit, setIsCredit] = useState(false);
+  // Customer State (General)
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [customerOptions, setCustomerOptions] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [paidAmount, setPaidAmount] = useState('');
   const [customersLoading, setCustomersLoading] = useState(false);
   const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
+
+  // Credit Bill State
+  const [isCredit, setIsCredit] = useState(false);
+  const [paidAmount, setPaidAmount] = useState('');
+
+  // Lucky Draw State
+  const [activeCampaign, setActiveCampaign] = useState(null);
+  const [excludedProductIds, setExcludedProductIds] = useState(new Set());
+  const [skipLuckyDraw, setSkipLuckyDraw] = useState(false);
+  const [isAddingPhone, setIsAddingPhone] = useState(false);
+  const [newPhoneInput, setNewPhoneInput] = useState('');
+  const [barcodeValue, setBarcodeValue] = useState('');
 
   // Barcode Scanning State
   // Migrated to global listener for better reliability
@@ -328,7 +327,6 @@ const CashierDashboard = () => {
   }, [searchTerm, fetchProducts]);
 
   useEffect(() => {
-    if (!isCredit) return;
     const fetchCust = async () => {
       setCustomersLoading(true);
       try {
@@ -342,7 +340,34 @@ const CashierDashboard = () => {
     };
     const delay = setTimeout(fetchCust, 500);
     return () => clearTimeout(delay);
-  }, [customerSearchTerm, isCredit]);
+  }, [customerSearchTerm]);
+
+  // Fetch active Lucky Draw campaign on mount
+  useEffect(() => {
+    const fetchActiveCampaign = async () => {
+      try {
+        const campaign = await luckyDrawApi.getActiveCampaign();
+        if (campaign) {
+          setActiveCampaign(campaign);
+          // Fetch excluded product IDs for fast lookup
+          try {
+            const excluded = await luckyDrawApi.getExcludedProducts(
+              campaign.id,
+            );
+            console.log('excluded==>', excluded);
+            setExcludedProductIds(
+              new Set((excluded?.excluded_products || []).map((p) => p.product_id)),
+            );
+          } catch {
+            // Non-fatal: proceed with empty exclusion set
+          }
+        }
+      } catch {
+        // Silent — no campaign is a normal state for the cashier
+      }
+    };
+    fetchActiveCampaign();
+  }, []);
 
   const updateQuantity = useCallback(
     (productId, deltaOrQty, isManual = false) => {
@@ -395,6 +420,21 @@ const CashierDashboard = () => {
     0,
   );
 
+  // Lucky Draw — eligible amount excludes excluded products and round adjustment
+  const eligibleAmount =
+    cart.reduce((sum, item) => {
+      console.log('item.id==>', item.id);
+      console.log('excludedProductIds==>', excludedProductIds);
+      console.log(
+        'excludedProductIds.has(item.id)==>',
+        excludedProductIds.has(item.id),
+      );
+      if (excludedProductIds.has(item.id)) return sum;
+      return sum + item.selling_price * (parseFloat(item.quantity) || 0);
+    }, 0) - Number(roundAdjust || 0);
+
+  console.log('eligibleAmount==>', eligibleAmount);
+
   const printBill = async (
     cartItems,
     totalAmount,
@@ -402,6 +442,7 @@ const CashierDashboard = () => {
     invoiceNumber,
     paymentMethod,
     date,
+    luckyDraw = null,
   ) => {
     try {
       const billData = {
@@ -418,6 +459,13 @@ const CashierDashboard = () => {
             total: (item.selling_price * item.quantity).toFixed(2),
           })),
           total: totalAmount.toFixed(2),
+          lucky_draw: luckyDraw
+            ? {
+                ticket_numbers: luckyDraw.ticket_numbers,
+                draw_date: luckyDraw.draw_date,
+                campaign_name: luckyDraw.campaign_name,
+              }
+            : null,
         },
       };
 
@@ -467,6 +515,15 @@ const CashierDashboard = () => {
           customer_id: selectedCustomer.id,
           paid_amount: Number(paidAmount || 0),
         }),
+        ...(!isCredit &&
+          selectedCustomer && { customer_id: selectedCustomer.id }),
+        participate_in_lucky_draw: !!(
+          activeCampaign &&
+          eligibleAmount >= parseFloat(activeCampaign.min_bill_amount) &&
+          selectedCustomer &&
+          selectedCustomer.phone &&
+          !skipLuckyDraw
+        ),
       });
 
       setStatus({
@@ -487,6 +544,32 @@ const CashierDashboard = () => {
             dateStyle: 'medium',
             timeStyle: 'medium',
           }).format(new Date()),
+          response.lucky_draw ?? null,
+        );
+      }
+
+      if (response.lucky_draw && selectedCustomer && selectedCustomer.phone) {
+        const { campaign_name, ticket_numbers, draw_date } =
+          response.lucky_draw;
+        const message = `Hello ${selectedCustomer.name},
+
+Thank you for shopping at Family Super Mart!
+
+You have successfully entered our Mega Lucky Draw 2026.
+Your Ticket Number(s): ${ticket_numbers.join(', ')}
+Draw Date: After 15th August 2026
+
+Best of luck!`;
+
+        console.log('message===>', message);
+
+        let phone = selectedCustomer.phone.replace(/\\D/g, '');
+        if (phone.length === 10) {
+          phone = '91' + phone;
+        }
+
+        window.open(
+          `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`,
         );
       }
 
@@ -495,10 +578,50 @@ const CashierDashboard = () => {
       setRoundAdjust(0); // Reset round adjust after checkout
       setIsCredit(false);
       setSelectedCustomer(null);
+      setSkipLuckyDraw(false);
+      setIsAddingPhone(false);
+      setNewPhoneInput('');
       setPaidAmount('');
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Checkout failed' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  useEffect(() => {
+    setSkipLuckyDraw(false);
+    setIsAddingPhone(false);
+    setNewPhoneInput('');
+  }, [selectedCustomer?.id]);
+
+  const handleSavePhone = async () => {
+    if (!/^\d{10}$/.test(newPhoneInput)) {
+      setStatus({ type: 'error', message: 'Phone number must be 10 digits' });
+      return;
+    }
+    setProcessing(true);
+    try {
+      const updatedCustomer = await customersApi.updatePartial(
+        selectedCustomer.id,
+        {
+          phone: newPhoneInput,
+          name: selectedCustomer.name,
+        },
+      );
+      setSelectedCustomer(updatedCustomer);
+      setIsAddingPhone(false);
+      setStatus({
+        type: 'success',
+        message: 'Phone number updated successfully',
+      });
+    } catch (err) {
+      console.error('Failed to save phone number', err);
+      setStatus({
+        type: 'error',
+        message: 'Failed to save phone number. Please try again.',
+      });
     } finally {
       setProcessing(false);
     }
@@ -521,39 +644,6 @@ const CashierDashboard = () => {
         overflow: 'hidden', // Prevent outer scroll on desktop
       }}
     >
-      {/* Header */}
-      <Box
-        sx={{
-          mb: 2,
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          justifyContent: 'space-between',
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          gap: 2,
-          flexShrink: 0,
-        }}
-      >
-        <Typography
-          variant="h4"
-          fontWeight={900}
-          sx={{
-            color: 'text.primary',
-            fontSize: { xs: '1.5rem', sm: '1.8rem', lg: '2rem' },
-          }}
-        >
-          Cashier Terminal
-        </Typography>
-        <Button
-          variant="outlined"
-          color="secondary"
-          startIcon={<RemoveIcon />}
-          onClick={() => navigate('/cashier/return')}
-          sx={{ fontWeight: 700, borderRadius: 2, whiteSpace: 'nowrap' }}
-        >
-          Manage Returns
-        </Button>
-      </Box>
-
       {/* Main Content Area */}
       <Box
         sx={{
@@ -876,7 +966,7 @@ const CashierDashboard = () => {
                                   : 'numeric',
                               pattern:
                                 item.sale_type === 'WEIGHT'
-                                  ? '[0-9]*\.?[0-9]*'
+                                  ? '[0-9]*\\.?[0-9]*'
                                   : '[0-9]*',
                             }}
                             variant="outlined"
@@ -959,6 +1049,235 @@ const CashierDashboard = () => {
               Bill Summary
             </Typography>
 
+            {/* Lucky Draw Section */}
+            {activeCampaign &&
+              !isCredit &&
+              !skipLuckyDraw &&
+              eligibleAmount >= parseFloat(activeCampaign.min_bill_amount) && (
+                <Box
+                  sx={{
+                    mb: 2,
+                    p: 1.5,
+                    bgcolor: 'rgba(255, 193, 7, 0.08)',
+                    border: '1px solid',
+                    borderColor: 'warning.light',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={800}
+                    color="warning.dark"
+                    sx={{ mb: 0.5 }}
+                  >
+                    🎟 Lucky Draw Eligible!
+                  </Typography>
+                  {selectedCustomer ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {selectedCustomer.phone ? (
+                        <Box>
+                          <Typography variant="body2" fontWeight={700}>
+                            {selectedCustomer.name} ✓
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {Math.floor(
+                              eligibleAmount /
+                                parseFloat(activeCampaign.min_bill_amount),
+                            )}{' '}
+                            {Math.floor(
+                              eligibleAmount /
+                                parseFloat(activeCampaign.min_bill_amount),
+                            ) === 1
+                              ? 'entry'
+                              : 'entries'}{' '}
+                            will be generated
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ width: '100%' }}>
+                          <Typography
+                            variant="body2"
+                            color="error.main"
+                            fontWeight={700}
+                          >
+                            ⚠️ No phone number on file.
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: 'block', mb: 1 }}
+                          >
+                            A phone number is required to generate a lucky draw
+                            entry.
+                          </Typography>
+
+                          {isAddingPhone ? (
+                            <Box
+                              sx={{
+                                mt: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 1,
+                              }}
+                            >
+                              <Typography variant="caption" fontWeight={700}>
+                                Enter phone number:
+                              </Typography>
+                              <TextField
+                                size="small"
+                                placeholder="10-digit phone"
+                                value={newPhoneInput}
+                                onChange={(e) =>
+                                  setNewPhoneInput(
+                                    e.target.value
+                                      .replace(/\D/g, '')
+                                      .slice(0, 10),
+                                  )
+                                }
+                                autoFocus
+                                fullWidth
+                              />
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={handleSavePhone}
+                                  disabled={processing}
+                                >
+                                  Save & Participate
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => setIsAddingPhone(false)}
+                                >
+                                  Cancel
+                                </Button>
+                              </Box>
+                            </Box>
+                          ) : (
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => setIsAddingPhone(true)}
+                              >
+                                Add Phone Number
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="text"
+                                color="inherit"
+                                onClick={() => setSkipLuckyDraw(true)}
+                              >
+                                Skip Lucky Draw
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Eligible ₹{eligibleAmount.toFixed(2)} →{' '}
+                      {Math.floor(
+                        eligibleAmount /
+                          parseFloat(activeCampaign.min_bill_amount),
+                      )}{' '}
+                      entries · Select a customer above to participate
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Autocomplete
+                fullWidth
+                options={customerOptions}
+                getOptionLabel={(option) =>
+                  `${option.name} (${option.phone || 'N/A'})`
+                }
+                value={selectedCustomer}
+                onChange={(_, newValue) => setSelectedCustomer(newValue)}
+                onInputChange={(_, newInputValue) =>
+                  setCustomerSearchTerm(newInputValue)
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Search Customer"
+                    size="small"
+                    placeholder="Name or Phone"
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <React.Fragment>
+                          {customersLoading ? (
+                            <CircularProgress color="inherit" size={20} />
+                          ) : null}
+                          {params.InputProps.endAdornment}
+                        </React.Fragment>
+                      ),
+                    }}
+                  />
+                )}
+              />
+              <IconButton
+                color="primary"
+                onClick={() => setAddCustomerModalOpen(true)}
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  bgcolor: 'rgba(0,0,0,0.02)',
+                }}
+              >
+                <PersonAddIcon />
+              </IconButton>
+            </Box>
+
+            {/* {selectedCustomer && (
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.5,
+                  bgcolor: 'primary.action.hover',
+                  borderRadius: 2,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  border: '1px solid',
+                  borderColor: 'primary.light',
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="body2"
+                    fontWeight={700}
+                    color="primary.dark"
+                  >
+                    {selectedCustomer.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {selectedCustomer.phone || 'No Phone'}
+                  </Typography>
+                </Box>
+                <IconButton
+                  size="small"
+                  onClick={() => setSelectedCustomer(null)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            )} */}
+
             <Box
               sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}
             >
@@ -1034,7 +1353,7 @@ const CashierDashboard = () => {
               </Box>
             </Box>
 
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mt: 0 }}>
               <FormControlLabel
                 control={
                   <Switch
@@ -1061,51 +1380,15 @@ const CashierDashboard = () => {
                     borderColor: 'divider',
                   }}
                 >
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="primary"
-                    startIcon={<PersonAddIcon />}
-                    onClick={() => setAddCustomerModalOpen(true)}
-                    sx={{
-                      fontWeight: 700,
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      mb: 1,
-                    }}
-                  >
-                    New Customer
-                  </Button>
-
-                  <Autocomplete
-                    options={customerOptions}
-                    getOptionLabel={(option) =>
-                      `${option.name} (${option.phone || 'N/A'}) - Due: ₹${parseFloat(option.total_due).toFixed(2)}`
-                    }
-                    value={selectedCustomer}
-                    onChange={(_, newValue) => setSelectedCustomer(newValue)}
-                    onInputChange={(_, newInputValue) =>
-                      setCustomerSearchTerm(newInputValue)
-                    }
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Select Customer"
-                        size="small"
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: (
-                            <React.Fragment>
-                              {customersLoading ? (
-                                <CircularProgress color="inherit" size={20} />
-                              ) : null}
-                              {params.InputProps.endAdornment}
-                            </React.Fragment>
-                          ),
-                        }}
-                      />
-                    )}
-                  />
+                  {!selectedCustomer && (
+                    <Typography
+                      variant="body2"
+                      color="error"
+                      sx={{ textAlign: 'center', mb: 1 }}
+                    >
+                      Please select a customer at the top
+                    </Typography>
+                  )}
                   {selectedCustomer && (
                     <>
                       <Box

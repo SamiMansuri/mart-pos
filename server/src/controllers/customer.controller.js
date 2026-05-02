@@ -70,7 +70,7 @@ export const getCustomerById = asyncHandler(async (req, res) => {
 // ─── UPDATE CUSTOMER ─────────────────────────────────────────────
 export const updateCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, phone, credit_limit, notes } = req.body;
+  const { name, phone, credit_limit = 0, notes = null } = req.body;
 
   try {
     const { rows } = await pool.query(Q.UPDATE_CUSTOMER, [
