@@ -58,8 +58,8 @@ export const PRODUCT_QUERIES = {
   },
   GET_BY_ID: (isAdmin) => {
     const fields = isAdmin
-      ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, s.mrp"
-      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, s.mrp";
+      ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, s.mrp, p.gst_rate, p.hsn_code, p.sale_type"
+      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, s.mrp, p.gst_rate, p.hsn_code, p.sale_type";
     return `
       SELECT ${fields} 
       FROM products p 
@@ -73,8 +73,8 @@ export const PRODUCT_QUERIES = {
     `;
   },
   CREATE: `
-    INSERT INTO products (name, barcode, selling_price, created_by, sale_type)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO products (name, barcode, selling_price, created_by, sale_type, gst_rate, hsn_code)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *
   `,
   UPDATE: `
@@ -85,7 +85,9 @@ export const PRODUCT_QUERIES = {
       selling_price = COALESCE($3, selling_price),
       updated_by = $4,
       updated_at = NOW(),
-      sale_type = COALESCE($6, sale_type)
+      sale_type = COALESCE($6, sale_type),
+      gst_rate = COALESCE($7, gst_rate),
+      hsn_code = COALESCE($8, hsn_code)
     WHERE id = $5
     RETURNING *
   `,
@@ -163,8 +165,17 @@ export const BILL_QUERIES = {
     VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7, $8, $9, false, NULL, $2)
     RETURNING *
   `,
-  CREATE_ITEM:
-    "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price, mrp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+  CREATE_ITEM: `
+    INSERT INTO bill_items (
+      bill_id, 
+      product_id, 
+      quantity, price, line_total, 
+      product_name, batch_id, cost_price, mrp, 
+      taxable_amount, gst_rate, cgst_amount, sgst_amount
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+    )
+  `,
   GET_BY_ID: `SELECT
        b.id AS bill_id,
        b.bill_number,
@@ -185,7 +196,11 @@ export const BILL_QUERIES = {
        c.name AS customer_name,
        c.phone AS customer_phone,
        c.total_due as customer_total_due,
-       b.customer_id as customer_id
+       b.customer_id as customer_id,
+       bi.gst_rate,
+       bi.cgst_amount,
+       bi.sgst_amount,
+       bi.taxable_amount
      FROM bills b
      JOIN bill_items bi ON bi.bill_id = b.id
      JOIN products p ON p.id = bi.product_id

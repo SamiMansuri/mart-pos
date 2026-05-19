@@ -35,6 +35,8 @@ const AddProduct = () => {
     mrp: '',
     expiry_date: '',
     sale_type: 'UNIT',
+    gst_rate: '',
+    hsn_code: '',
   });
 
   const handleChange = (e) => {
@@ -47,6 +49,15 @@ const AddProduct = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Check GST rate before other fields
+    if (formData.gst_rate === '') {
+      setStatus({
+        type: 'error',
+        message: 'Please select a GST rate',
+      });
+      return;
+    }
 
     // Basic validation
     if (!formData.product_name || !formData.selling_price) {
@@ -66,12 +77,15 @@ const AddProduct = () => {
           ? parseInt(formData.quantity, 10)
           : parseFloat(formData.quantity)
         : 0;
+
       await productsApi.create({
         ...formData,
         selling_price: parseFloat(formData.selling_price),
         quantity: qty,
         cost_price: formData.cost_price ? parseFloat(formData.cost_price) : 0,
         mrp: formData.mrp ? parseFloat(formData.mrp) : 0,
+        gst_rate: parseFloat(formData.gst_rate) || 0,
+        hsn_code: formData.hsn_code || '',
       });
 
       setStatus({
@@ -90,6 +104,8 @@ const AddProduct = () => {
         mrp: '',
         expiry_date: '',
         sale_type: 'UNIT',
+        gst_rate: '',
+        hsn_code: '',
       });
 
       // Focus on product name field (optional but helpful)
@@ -249,6 +265,36 @@ const AddProduct = () => {
                   ),
                 }}
                 inputProps={{ step: '0.01', min: '0' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth required>
+                <InputLabel shrink={true}>GST Rate</InputLabel>
+                <Select
+                  name="gst_rate"
+                  value={formData.gst_rate}
+                  label="GST Rate"
+                  onChange={handleChange}
+                  displayEmpty
+                >
+                  <MenuItem value="">Select GST Rate</MenuItem>
+                  <MenuItem value="0">0% (Fresh/Exempt)</MenuItem>
+                  <MenuItem value="5">5% (Packaged Food)</MenuItem>
+                  <MenuItem value="12">12% (Processed Food)</MenuItem>
+                  <MenuItem value="18">18% (Other)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="HSN Code (Optional)"
+                name="hsn_code"
+                value={formData.hsn_code}
+                onChange={handleChange}
+                placeholder="e.g. 0902"
+                inputProps={{ maxLength: 8 }}
               />
             </Grid>
             <Grid item xs={12} md={3}>

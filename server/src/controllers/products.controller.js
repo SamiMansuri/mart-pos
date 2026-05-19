@@ -96,6 +96,8 @@ export const createProduct = asyncHandler(async (req, res) => {
     expiry_date,
     mrp,
     sale_type,
+    gst_rate,
+    hsn_code,
   } = req.body;
   const { user_id } = req.user;
 
@@ -110,6 +112,8 @@ export const createProduct = asyncHandler(async (req, res) => {
         selling_price,
         user_id,
         sale_type || 'UNIT',
+        gst_rate || 0,
+        hsn_code || '',
       ]);
 
       product = productRes.rows[0];
@@ -166,7 +170,7 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { product_name: name, barcode, selling_price, mrp, sale_type } = req.body;
+  const { product_name: name, barcode, selling_price, mrp, sale_type, gst_rate, hsn_code } = req.body;
 
   const { user_id } = req.user;
   const productId = req.params.product_id;
@@ -192,6 +196,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
       user_id,
       productId,
       sale_type ?? null,
+      gst_rate ?? null,
+      hsn_code ?? null,
     ]);
 
     const updatedProduct = updateRes.rows[0];
@@ -218,12 +224,16 @@ export const updateProduct = asyncHandler(async (req, res) => {
           barcode: oldProduct.barcode,
           selling_price: oldProduct.selling_price,
           mrp: oldProduct.mrp,
+          gst_rate: oldProduct.gst_rate,
+          hsn_code: oldProduct.hsn_code,
         },
         new: {
           name: updatedProduct.name,
           barcode: updatedProduct.barcode,
           selling_price: updatedProduct.selling_price,
           mrp: mrp !== undefined ? mrp : oldProduct.mrp,
+          gst_rate: gst_rate !== undefined ? gst_rate : oldProduct.gst_rate,
+          hsn_code: hsn_code !== undefined ? hsn_code : oldProduct.hsn_code,
         },
       },
     );
