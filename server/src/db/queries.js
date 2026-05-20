@@ -350,3 +350,56 @@ export const CUSTOMER_QUERIES = {
     SELECT total_due FROM customers WHERE id = $1
   `,
 };
+
+export const SUPPLIER_QUERIES = {
+  GET_ALL: `
+    SELECT * FROM suppliers
+    ORDER BY name ASC
+  `,
+  GET_BY_ID: `
+    SELECT * FROM suppliers WHERE id = $1
+  `,
+  CREATE: `
+    INSERT INTO suppliers (name, phone, gstin, address, created_by)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING *
+  `,
+};
+
+export const PURCHASE_QUERIES = {
+  GET_ALL: `
+    SELECT 
+      p.*,
+      s.name AS supplier_name
+    FROM purchases p
+    LEFT JOIN suppliers s ON s.id = p.supplier_id
+    ORDER BY p.created_at DESC
+  `,
+  GET_BY_ID: `
+    SELECT 
+      p.*,
+      s.name AS supplier_name,
+      s.gstin AS supplier_gstin
+    FROM purchases p
+    LEFT JOIN suppliers s ON s.id = p.supplier_id
+    WHERE p.id = $1
+  `,
+  GET_ITEMS: `
+    SELECT 
+      pi.*,
+      pr.name AS product_name
+    FROM purchase_items pi
+    JOIN products pr ON pr.id = pi.product_id
+    WHERE pi.purchase_id = $1
+  `,
+  CREATE: `
+    INSERT INTO purchases (supplier_id, invoice_no, invoice_date, total_amount, total_taxable, total_cgst, total_sgst, notes, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *
+  `,
+  CREATE_ITEM: `
+    INSERT INTO purchase_items (purchase_id, product_id, batch_no, expiry_date, qty, cost_price, mrp, taxable_amount, gst_rate, cgst_amount, sgst_amount, total_amount)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    RETURNING *
+  `,
+};

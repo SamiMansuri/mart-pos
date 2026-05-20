@@ -33,6 +33,7 @@ import {
   MoreVert as MoreIcon,
   Contacts as ContactsIcon,
   CardGiftcard as GiftIcon,
+  ShoppingCart as PurchaseIcon,
 } from '@mui/icons-material';
 import { isAdmin, isCashier, getUserInfo } from '../utils/auth.utils';
 import { authApi } from '../api/api';
@@ -73,6 +74,10 @@ const Layout = () => {
     if (location.pathname.startsWith('/admin/users')) return '/admin/users';
     if (location.pathname.startsWith('/admin/products'))
       return '/admin/products';
+    if (location.pathname.startsWith('/admin/purchases/new'))
+      return '/admin/purchases/new';
+    if (location.pathname.startsWith('/admin/purchases'))
+      return '/admin/purchases';
     if (location.pathname.startsWith('/admin/lucky-draw'))
       return '/admin/lucky-draw';
     if (location.pathname.startsWith('/admin')) return '/admin';
@@ -94,6 +99,8 @@ const Layout = () => {
             icon: <InventoryIcon />,
             path: '/admin/products',
           },
+          { text: 'Purchase Entry', icon: <PurchaseIcon />, path: '/admin/purchases/new' },
+          { text: 'Purchase History', icon: <HistoryIcon />, path: '/admin/purchases' },
           { text: 'Lucky Draw', icon: <GiftIcon />, path: '/admin/lucky-draw' },
           { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
         ]
@@ -105,6 +112,8 @@ const Layout = () => {
             icon: <InventoryIcon />,
             path: '/admin/products',
           },
+          { text: 'Purchase Entry', icon: <PurchaseIcon />, path: '/admin/purchases/new' },
+          { text: 'Purchase History', icon: <HistoryIcon />, path: '/admin/purchases' },
         ]
       : []),
     { text: 'Cashier', icon: <CashierIcon />, path: '/cashier' },
@@ -236,13 +245,13 @@ const Layout = () => {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <AppBar position="sticky" color="default" elevation={0}>
         <Toolbar sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          {/* Hamburger Menu - Show on mobile and tablet */}
+          {/* Hamburger Menu - Show on all screens */}
           <IconButton
             color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { lg: 'none' } }}
+            sx={{ mr: 2 }}
           >
             <MenuIcon />
           </IconButton>
@@ -280,9 +289,11 @@ const Layout = () => {
             </Typography>
           </Box>
 
-          {/* Desktop Navigation - Hidden on mobile/tablet */}
+          {/* Desktop Navigation - Specific items moved to drawer */}
           <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1, mr: 2 }}>
-            {menuItems.map((item) => (
+            {menuItems
+              .filter(item => !['Purchase Entry', 'Purchase History', 'Lucky Draw', 'Reports'].includes(item.text))
+              .map((item) => (
               <Button
                 key={item.path}
                 component={Link}
@@ -295,78 +306,10 @@ const Layout = () => {
               </Button>
             ))}
           </Box>
-
-          {/* Account Menu - Desktop only */}
-          <Box sx={{ display: { xs: 'none', lg: 'flex' } }}>
-            <IconButton onClick={handleMenuOpen} size="small" sx={{ ml: 2 }}>
-              <MoreIcon />
-            </IconButton>
-            <Menu
-              anchorEl={anchorEl}
-              open={Boolean(anchorEl)}
-              onClose={handleMenuClose}
-              transitionDuration={150}
-              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-              PaperProps={{
-                elevation: 3,
-                sx: { mt: 1, minWidth: 200 },
-              }}
-            >
-              <Box sx={{ px: 2, py: 1.5 }}>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  {user?.userName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {user?.role?.toUpperCase()}
-                </Typography>
-              </Box>
-              <Divider />
-              {showAdminTab && (
-                <MenuItem
-                  onClick={() => {
-                    handleMenuClose();
-                    navigate('/admin/users');
-                  }}
-                  sx={{ py: 1.5 }}
-                >
-                  <ListItemIcon>
-                    <PeopleIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText primary="Employees" />
-                </MenuItem>
-              )}
-              <MenuItem
-                onClick={() => {
-                  handleMenuClose();
-                  navigate('/change-password');
-                }}
-                sx={{ py: 1.5 }}
-              >
-                <ListItemIcon>
-                  <LockIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary="Change Password" />
-              </MenuItem>
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  handleMenuClose();
-                  handleLogout();
-                }}
-                sx={{ py: 1.5, color: 'error.main' }}
-              >
-                <ListItemIcon>
-                  <LogoutIcon fontSize="small" color="error" />
-                </ListItemIcon>
-                <ListItemText primary="Logout" />
-              </MenuItem>
-            </Menu>
-          </Box>
         </Toolbar>
       </AppBar>
 
-      {/* Mobile Drawer */}
+      {/* Drawer */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -375,7 +318,6 @@ const Layout = () => {
           keepMounted: true, // Better open performance on mobile.
         }}
         sx={{
-          display: { xs: 'block', lg: 'none' },
           '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
         }}
       >

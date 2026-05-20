@@ -7,6 +7,8 @@ import reportsRouter from "./reports.routes.js";
 import stockRouter from "./stock.routes.js";
 import customersRouter from "./customer.routes.js";
 import luckyDrawRouter from "./luckydraw.routes.js";
+import supplierRoutes from "./suppliers.routes.js";
+import purchaseRoutes from "./purchases.routes.js";
 
 const router = express.Router();
 
@@ -18,5 +20,7 @@ router.use("/reports", reportsRouter);
 router.use("/stock", stockRouter);
 router.use("/customers", customersRouter);
 router.use("/lucky-draw", luckyDrawRouter);
+router.use("/suppliers", supplierRoutes);
+router.use("/purchases", purchaseRoutes);
 
 export default router;
