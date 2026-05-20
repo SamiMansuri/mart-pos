@@ -190,9 +190,11 @@ export const generateLuckyDrawEntries = async ({
     // 4. Minimum check
     const minAmount = parseFloat(campaign.min_bill_amount);
     if (eligibleAmount < minAmount) {
+      console.log(`Eligible ₹${eligibleAmount.toFixed(2)} is below minimum ₹${minAmount}`)
       return {
         generated: false,
-        reason: `Eligible ₹${eligibleAmount.toFixed(2)} below minimum ₹${minAmount}`,
+        // reason: `Eligible ₹${eligibleAmount.toFixed(2)} is below minimum ₹${minAmount}`,
+        reason: `Bill is not eligible for lucky draw`,
       };
     }
 
@@ -241,7 +243,7 @@ export const generateLuckyDrawEntries = async ({
       customerName: rows[0].name,
     };
   } catch (error) {
-    await client.query("ROLLBACK").catch(() => {});
+    await client.query("ROLLBACK").catch(() => { });
     console.error("generateLuckyDrawEntries error:", error);
     return {
       generated: false,

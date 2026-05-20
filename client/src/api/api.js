@@ -143,6 +143,13 @@ export const luckyDrawApi = {
     apiFetch(`/lucky-draw/campaigns/${id}/excluded-products/${productId}`, {
       method: 'DELETE',
     }),
+  getEntriesByBill: (billNumber) =>
+    apiFetch(`/lucky-draw/entries/${billNumber}`),
+  createManualEntry: (data) =>
+    apiFetch('/lucky-draw/campaigns/manual-entry', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 export const authApi = {

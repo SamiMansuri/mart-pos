@@ -367,12 +367,12 @@ export const createBill = asyncHandler(async (req, res) => {
       ...bill,
       lucky_draw: luckyDrawResult?.generated
         ? {
-            ticket_numbers: luckyDrawResult.ticketNumbers,
-            entry_count: luckyDrawResult.entryCount,
-            eligible_amount: luckyDrawResult.eligibleAmount,
-            campaign_name: luckyDrawResult.campaignName,
-            draw_date: luckyDrawResult.drawDate,
-          }
+          ticket_numbers: luckyDrawResult.ticketNumbers,
+          entry_count: luckyDrawResult.entryCount,
+          eligible_amount: luckyDrawResult.eligibleAmount,
+          campaign_name: luckyDrawResult.campaignName,
+          draw_date: luckyDrawResult.drawDate,
+        }
         : null,
     },
     message: isNew ? "Bill created successfully" : "Bill already exists",

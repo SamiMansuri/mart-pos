@@ -31,6 +31,7 @@ import {
   MoreVert as MoreIcon,
 } from '@mui/icons-material';
 import { getUserInfo } from '../utils/auth.utils';
+import LuckyDrawModal from '../components/LuckyDrawModal';
 
 const BillHistory = () => {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ const BillHistory = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editValue, setEditValue] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [luckyDrawOpen, setLuckyDrawOpen] = useState(false);
 
   const user = getUserInfo();
   const limit = 100;
@@ -395,7 +397,22 @@ const BillHistory = () => {
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
           >
-            <MenuItem onClick={handleEditOpen}>Edit Bill</MenuItem>
+            <MenuItem
+              onClick={() => {
+                setLuckyDrawOpen(true);
+                setAnchorEl(null);
+              }}
+            >
+              Create Lucky Draw
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleEditOpen();
+                setAnchorEl(null);
+              }}
+            >
+              Edit Bill
+            </MenuItem>
             <MenuItem
               onClick={() => {
                 navigate('/cashier/return', {
@@ -425,7 +442,10 @@ const BillHistory = () => {
               View Receipt
             </MenuItem>
             {selectedBill && !selectedBill.is_void && (
-              <MenuItem onClick={handleVoid} sx={{ color: 'error.main' }}>
+              <MenuItem
+                onClick={handleVoid}
+                sx={{ color: 'error.main' }}
+              >
                 Void Transaction
               </MenuItem>
             )}
@@ -487,6 +507,15 @@ const BillHistory = () => {
               </Button>
             </DialogActions>
           </Dialog>
+
+          <LuckyDrawModal
+            open={luckyDrawOpen}
+            onClose={() => {
+              setLuckyDrawOpen(false);
+              setSelectedBill(null);
+            }}
+            bill={selectedBill}
+          />
         </>
       )}
     </Box>

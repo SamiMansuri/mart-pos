@@ -5,6 +5,7 @@ import { getSuccessResponse } from "../utils/response.util.js";
 import {
   createCampaignSequence,
   generateStartOffset,
+  generateLuckyDrawEntries,
 } from "../services/luckydraw.service.js";
 
 export const createCampaign = asyncHandler(async (req, res) => {
@@ -235,63 +236,135 @@ export const removeExcludedProduct = asyncHandler(async (req, res) => {
 });
 
 export const manualLuckyDrawEntry = asyncHandler(async (req, res) => {
-  const { bill_id } = req.query;
+  const { bill_id, customer_id } = req.body;
 
   if (!bill_id) {
     throw createHttpError(400, "bill_id is required.");
   }
 
-  const bill = await pool.query(
-    `SELECT p.name, p.selling_price, p.id as product_id, bi.quantity, bi.line_total FROM 
-    bills b
-    JOIN bill_items bi ON bi.bill_id = b.id
-    JOIN products p ON p.id = bi.product_id
-    WHERE bill_number = $1`,
+  // 1. Fetch bill details
+  const billRes = await pool.query(
+    `SELECT b.id, b.bill_number, b.customer_id, b.round_adjustment, b.total_amount, b.business_date
+     FROM bills b 
+     WHERE b.id = $1`,
     [bill_id],
   );
-  if (bill.rows.length === 0) {
+
+  if (!billRes.rows.length) {
     throw createHttpError(404, "Bill not found.");
   }
 
-  console.log("bill==>", bill.rows[0]);
+  const bill = billRes.rows[0];
 
-  const items = bill.rows.map((item) => {
-    return {
-      product_id: item.product_id,
-      quantity: item.quantity,
-    };
-  });
-
-  const productMap = new Map();
-  items.forEach((item) => {
-    productMap.set(item.product_id, {
-      selling_price: item.selling_price,
-      name: item.name,
-    });
-  });
-
-  const campaign = await pool.query(
-    `SELECT id FROM lucky_draw_campaigns WHERE status = 'active' LIMIT 1`,
+  // 2. Fetch active campaign
+  const campaignRes = await pool.query(
+    `SELECT * FROM lucky_draw_campaigns WHERE status = 'active' LIMIT 1`,
   );
-  if (campaign.rows.length === 0) {
-    throw createHttpError(404, "No active campaign found.");
+  if (campaignRes.rows.length === 0) {
+    throw createHttpError(404, "No active lucky draw campaign found.");
+  }
+  const campaign = campaignRes.rows[0];
+
+  // 3. Date Validation: Bill date must be between campaign start and draw date
+  // business_date usually comes in 'YYYY-MM-DD' format
+  const billDate = new Date(bill.business_date);
+  const startDate = new Date(campaign.start_date);
+  const drawDate = new Date(campaign.draw_date);
+
+  // Simple string comparison or date comparison
+  if (billDate < startDate || billDate > drawDate) {
+    throw createHttpError(
+      400,
+      `Bill is not eligible for lucky draw`,
+    );
   }
 
+  // 4. Determine customer
+  const finalCustomerId = customer_id || bill.customer_id;
+  if (!finalCustomerId) {
+    throw createHttpError(
+      400,
+      "Bill is not linked to a customer and no customer_id was provided.",
+    );
+  }
+
+  // 5. Check for existing lucky draw entries
   const existingEntry = await pool.query(
-    `SELECT * FROM lucky_draw_entries WHERE bill_id = $1`,
-    [bill_id],
+    `SELECT * FROM lucky_draw_entries WHERE bill_number = $1`,
+    [bill.bill_number],
   );
 
   if (existingEntry.rows.length > 0) {
     throw createHttpError(400, "Bill already has a lucky draw entry.");
   }
 
+  // 4. Fetch bill items for eligible amount calculation
+  const itemsRes = await pool.query(
+    `SELECT bi.product_id, bi.quantity, p.selling_price, p.name
+     FROM bill_items bi
+     JOIN products p ON p.id = bi.product_id
+     WHERE bi.bill_id = $1`,
+    [bill.id],
+  );
+
+  if (itemsRes.rows.length === 0) {
+    throw createHttpError(400, "Bill has no items.");
+  }
+
+  const normalizedItems = itemsRes.rows.map((item) => ({
+    product_id: item.product_id,
+    quantity: parseFloat(item.quantity),
+  }));
+
+  const productMap = new Map();
+  itemsRes.rows.forEach((item) => {
+    productMap.set(item.product_id, {
+      selling_price: item.selling_price,
+      name: item.name,
+    });
+  });
+
+  // 5. Generate lucky draw entries
+  const luckyDrawResult = await generateLuckyDrawEntries({
+    billId: bill.bill_number,
+    items: normalizedItems,
+    productMap,
+    customerId: finalCustomerId,
+    roundAdjustment: Number(bill.round_adjustment || 0),
+  });
+
+  if (!luckyDrawResult.generated) {
+    throw createHttpError(400, luckyDrawResult.reason || "Failed to generate lucky draw entries.");
+  }
+
   return res.status(201).json(
     getSuccessResponse({
-      message: "Manual lucky draw entry added successfully.",
+      message: "Lucky draw entries generated successfully.",
       data: {
-        lucky_draw_entry: result.rows[0],
+        lucky_draw: {
+          ticket_numbers: luckyDrawResult.ticketNumbers,
+          entry_count: luckyDrawResult.entryCount,
+          eligible_amount: luckyDrawResult.eligibleAmount,
+          campaign_name: luckyDrawResult.campaignName,
+          draw_date: luckyDrawResult.drawDate,
+        },
       },
+    }),
+  );
+});
+
+export const getLuckyDrawByBill = asyncHandler(async (req, res) => {
+  const { bill_number } = req.params;
+
+  const result = await pool.query(
+    `SELECT * FROM lucky_draw_entries WHERE bill_number = $1`,
+    [bill_number],
+  );
+
+  return res.status(200).json(
+    getSuccessResponse({
+      message: "Lucky draw entries fetched successfully.",
+      data: result.rows,
     }),
   );
 });

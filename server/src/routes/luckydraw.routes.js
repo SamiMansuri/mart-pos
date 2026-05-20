@@ -8,6 +8,7 @@ import {
   addExcludedProduct,
   removeExcludedProduct,
   manualLuckyDrawEntry,
+  getLuckyDrawByBill,
 } from "../controllers/luckydraw.controller.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { allowAdmin } from "../middlewares/allowAdmin.js";
@@ -28,6 +29,7 @@ router
   .post(addExcludedProduct)
   .delete(removeExcludedProduct);
 
-router.post("/campaigns/manual-entry", allowAdmin, manualLuckyDrawEntry);
+router.get("/entries/:bill_number", getLuckyDrawByBill);
+router.post("/campaigns/manual-entry", manualLuckyDrawEntry);
 
 export default router;
