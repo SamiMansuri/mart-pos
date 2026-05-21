@@ -725,7 +725,7 @@ const PurchaseEntry = () => {
         onAdded={(s) => { setSuppliers((prev) => [s, ...prev]); setSupplier(s); }} />
       <AddProductModal open={openProductModal} initialName={addProductName}
         onClose={() => setOpenProductModal(false)}
-        onAdded={(p) => { setSelectedProduct(p); setOpenProductModal(false); }} />
+        onAdded={(p) => { handleProductSelect(p); setOpenProductModal(false); }} />
     </Box>
   );
 };
