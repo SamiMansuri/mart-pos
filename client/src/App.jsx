@@ -9,6 +9,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import BillHistory from './pages/BillHistory';
 import AddProduct from './pages/AddProduct';
 import ProductsList from './pages/ProductsList';
+import PurchaseEntry from './pages/PurchaseEntry';
+import PurchasesList from './pages/PurchasesList';
+import PurchaseDetails from './pages/PurchaseDetails';
 import CreateEmployee from './pages/CreateEmployee';
 import EmployeeList from './pages/EmployeeList';
 import ReturnBill from './pages/ReturnBill';
@@ -191,6 +194,30 @@ function App() {
             element={
               <RoleGuard allowedRoles={['cashier', 'admin']}>
                 <ProductsList />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/purchases/new"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <PurchaseEntry />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/purchases"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <PurchasesList />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="admin/purchases/:id"
+            element={
+              <RoleGuard allowedRoles={['cashier', 'admin']}>
+                <PurchaseDetails />
               </RoleGuard>
             }
           />

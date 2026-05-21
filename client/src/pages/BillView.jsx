@@ -176,6 +176,21 @@ const BillView = () => {
           >
             Family Mart
           </Typography>
+          <Typography variant="body2" sx={{ fontSize: '11px' }}>
+            01 Plalinum Complex, Motipura Road, Himatnagar, Gujarat - 383001
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ fontSize: '11px', fontWeight: 'bold' }}
+          >
+            GSTIN: 3561514833369510
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ fontSize: '11px', fontWeight: 'bold' }}
+          >
+            TAX INVOICE
+          </Typography>
         </Box>
 
         <Divider sx={{ borderStyle: 'dashed', borderColor: 'black', my: 1 }} />
@@ -319,40 +334,244 @@ const BillView = () => {
           </Table>
         </TableContainer>
 
-        <Divider sx={{ borderStyle: 'dashed', borderColor: 'black', my: 1 }} />
+        <Divider sx={{ borderStyle: 'solid', borderColor: 'black', my: 1 }} />
 
         {/* Totals */}
-        <Box sx={{ mb: 1 }}>
+        <Box sx={{ mb: 1, mt: 1 }}>
           <Box
-            sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
           >
-            <Typography variant="body2" sx={{ fontSize: '12px' }}>
-              Subtotal:
+            <Typography
+              variant="body2"
+              sx={{ fontSize: '12px', fontWeight: 'bold' }}
+            >
+              Items: {bill.items?.length || 0}
             </Typography>
-            <Typography variant="body2" sx={{ fontSize: '12px' }}>
+            <Typography
+              variant="body2"
+              sx={{ fontSize: '12px', fontWeight: 'bold' }}
+            >
+              Qty:{' '}
+              {bill.items?.reduce(
+                (sum, item) => sum + Number(item.quantity),
+                0,
+              )}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ fontSize: '12px', fontWeight: 'bold' }}
+            >
               {parseFloat(bill.total_amount).toFixed(2)}
-            </Typography>
-          </Box>
-          <Divider
-            sx={{ borderStyle: 'dashed', borderColor: 'black', my: 0.5 }}
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography
-              variant="body2"
-              sx={{ fontSize: '16px', fontWeight: 'bold' }}
-            >
-              Grand Total:
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{ fontSize: '16px', fontWeight: 'bold' }}
-            >
-              ₹{parseFloat(bill.total_amount).toFixed(2)}
             </Typography>
           </Box>
         </Box>
 
-        <Divider sx={{ borderStyle: 'dashed', borderColor: 'black', my: 1 }} />
+        {/* <Divider sx={{ borderStyle: 'dashed', borderColor: 'black', my: 1 }} /> */}
+        {/* GST Breakup */}
+        {(() => {
+          // Group items by gst_rate
+          const gstGroups = {};
+          bill.items.forEach((item) => {
+            const rate = parseFloat(item.gst_rate) || 0;
+            if (!gstGroups[rate]) {
+              gstGroups[rate] = { taxable: 0, cgst: 0, sgst: 0, total: 0 };
+            }
+            gstGroups[rate].taxable += parseFloat(item.taxable_amount) || 0;
+            gstGroups[rate].cgst += parseFloat(item.cgst_amount) || 0;
+            gstGroups[rate].sgst += parseFloat(item.sgst_amount) || 0;
+            gstGroups[rate].total += parseFloat(item.line_total) || 0;
+          });
+
+          const hasGST = Object.keys(gstGroups).some((r) => parseFloat(r) > 0);
+          if (!hasGST) return null;
+
+          const totalTaxable = Object.values(gstGroups).reduce(
+            (s, g) => s + g.taxable,
+            0,
+          );
+          const totalCGST = Object.values(gstGroups).reduce(
+            (s, g) => s + g.cgst,
+            0,
+          );
+          const totalSGST = Object.values(gstGroups).reduce(
+            (s, g) => s + g.sgst,
+            0,
+          );
+
+          return (
+            <>
+              <Divider
+                sx={{ borderStyle: 'dashed', borderColor: 'black', my: 1 }}
+              />
+              <Typography
+                variant="body2"
+                sx={{ fontSize: '11px', fontWeight: 'bold', mb: 0.5 }}
+              >
+                GST Breakup
+              </Typography>
+              <TableContainer>
+                <Table size="small" padding="none">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          border: 'none',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        GST%
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          border: 'none',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        Taxable
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          border: 'none',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        CGST
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          border: 'none',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        SGST
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          border: 'none',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        Total
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.entries(gstGroups)
+                      .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
+                      .map(([rate, values]) => (
+                        <TableRow key={rate}>
+                          <TableCell
+                            sx={{ border: 'none', fontSize: '10px', py: 0.3 }}
+                          >
+                            {rate}%
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{ border: 'none', fontSize: '10px', py: 0.3 }}
+                          >
+                            {values.taxable.toFixed(2)}
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{ border: 'none', fontSize: '10px', py: 0.3 }}
+                          >
+                            {values.cgst.toFixed(2)}
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{ border: 'none', fontSize: '10px', py: 0.3 }}
+                          >
+                            {values.sgst.toFixed(2)}
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{ border: 'none', fontSize: '10px', py: 0.3 }}
+                          >
+                            {values.total.toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {/* Total Row */}
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          borderTop: '1px dashed black',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        Total
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          borderTop: '1px dashed black',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        {totalTaxable.toFixed(2)}
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          borderTop: '1px dashed black',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        {totalCGST.toFixed(2)}
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          borderTop: '1px dashed black',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        {totalSGST.toFixed(2)}
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          borderTop: '1px dashed black',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          py: 0.3,
+                        }}
+                      >
+                        {(totalTaxable + totalCGST + totalSGST).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          );
+        })()}
 
         {/* Payment Details */}
         <Box>

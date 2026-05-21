@@ -58,8 +58,8 @@ export const PRODUCT_QUERIES = {
   },
   GET_BY_ID: (isAdmin) => {
     const fields = isAdmin
-      ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, s.mrp"
-      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, s.mrp";
+      ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, s.mrp, p.gst_rate, p.hsn_code, p.sale_type"
+      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, s.mrp, p.gst_rate, p.hsn_code, p.sale_type";
     return `
       SELECT ${fields} 
       FROM products p 
@@ -73,8 +73,8 @@ export const PRODUCT_QUERIES = {
     `;
   },
   CREATE: `
-    INSERT INTO products (name, barcode, selling_price, created_by, sale_type)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO products (name, barcode, selling_price, created_by, sale_type, gst_rate, hsn_code)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *
   `,
   UPDATE: `
@@ -85,7 +85,9 @@ export const PRODUCT_QUERIES = {
       selling_price = COALESCE($3, selling_price),
       updated_by = $4,
       updated_at = NOW(),
-      sale_type = COALESCE($6, sale_type)
+      sale_type = COALESCE($6, sale_type),
+      gst_rate = COALESCE($7, gst_rate),
+      hsn_code = COALESCE($8, hsn_code)
     WHERE id = $5
     RETURNING *
   `,
@@ -163,8 +165,17 @@ export const BILL_QUERIES = {
     VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7, $8, $9, false, NULL, $2)
     RETURNING *
   `,
-  CREATE_ITEM:
-    "INSERT INTO bill_items (bill_id, product_id, quantity, price, line_total, product_name, batch_id, cost_price, mrp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+  CREATE_ITEM: `
+    INSERT INTO bill_items (
+      bill_id, 
+      product_id, 
+      quantity, price, line_total, 
+      product_name, batch_id, cost_price, mrp, 
+      taxable_amount, gst_rate, cgst_amount, sgst_amount
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+    )
+  `,
   GET_BY_ID: `SELECT
        b.id AS bill_id,
        b.bill_number,
@@ -185,7 +196,11 @@ export const BILL_QUERIES = {
        c.name AS customer_name,
        c.phone AS customer_phone,
        c.total_due as customer_total_due,
-       b.customer_id as customer_id
+       b.customer_id as customer_id,
+       bi.gst_rate,
+       bi.cgst_amount,
+       bi.sgst_amount,
+       bi.taxable_amount
      FROM bills b
      JOIN bill_items bi ON bi.bill_id = b.id
      JOIN products p ON p.id = bi.product_id
@@ -333,5 +348,58 @@ export const CUSTOMER_QUERIES = {
   // Used to compute balance_after before inserting ledger entry
   GET_CURRENT_BALANCE: `
     SELECT total_due FROM customers WHERE id = $1
+  `,
+};
+
+export const SUPPLIER_QUERIES = {
+  GET_ALL: `
+    SELECT * FROM suppliers
+    ORDER BY name ASC
+  `,
+  GET_BY_ID: `
+    SELECT * FROM suppliers WHERE id = $1
+  `,
+  CREATE: `
+    INSERT INTO suppliers (name, phone, gstin, address, created_by)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING *
+  `,
+};
+
+export const PURCHASE_QUERIES = {
+  GET_ALL: `
+    SELECT 
+      p.*,
+      s.name AS supplier_name
+    FROM purchases p
+    LEFT JOIN suppliers s ON s.id = p.supplier_id
+    ORDER BY p.created_at DESC
+  `,
+  GET_BY_ID: `
+    SELECT 
+      p.*,
+      s.name AS supplier_name,
+      s.gstin AS supplier_gstin
+    FROM purchases p
+    LEFT JOIN suppliers s ON s.id = p.supplier_id
+    WHERE p.id = $1
+  `,
+  GET_ITEMS: `
+    SELECT 
+      pi.*,
+      pr.name AS product_name
+    FROM purchase_items pi
+    JOIN products pr ON pr.id = pi.product_id
+    WHERE pi.purchase_id = $1
+  `,
+  CREATE: `
+    INSERT INTO purchases (supplier_id, invoice_no, invoice_date, total_amount, total_taxable, total_cgst, total_sgst, notes, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *
+  `,
+  CREATE_ITEM: `
+    INSERT INTO purchase_items (purchase_id, product_id, batch_no, expiry_date, qty, cost_price, mrp, taxable_amount, gst_rate, cgst_amount, sgst_amount, total_amount)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    RETURNING *
   `,
 };

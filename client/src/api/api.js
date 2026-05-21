@@ -213,3 +213,20 @@ export const reportsApi = {
     apiFetch(`/reports?startDate=${startDate}&endDate=${endDate}`),
   getCashierReport: (date) => apiFetch(`/reports/cashier?date=${date}`),
 };
+
+export const suppliersApi = {
+  getAll: () => apiFetch('/suppliers'),
+  create: (data) => apiFetch('/suppliers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+};
+
+export const purchasesApi = {
+  getAll: () => apiFetch('/purchases'),
+  getById: (id) => apiFetch(`/purchases/${id}`),
+  create: (data) => apiFetch('/purchases', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+};

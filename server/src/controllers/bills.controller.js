@@ -22,6 +22,7 @@ import {
   sendLuckyDraw,
   sendReceipt,
 } from "../services/whatsapp.service.js";
+import { calculateGST } from "../helper/calculateGST.js";
 
 export const createBill = asyncHandler(async (req, res) => {
   const {
@@ -84,7 +85,7 @@ export const createBill = asyncHandler(async (req, res) => {
       }
 
       const { rows } = await client.query(
-        "SELECT selling_price, name FROM products WHERE id = $1;",
+        "SELECT selling_price, name, gst_rate, hsn_code FROM products WHERE id = $1;",
         [item.product_id],
       );
 
@@ -219,6 +220,7 @@ export const createBill = asyncHandler(async (req, res) => {
 
         const deductionFromBatch = Math.min(batch.quantity, remainingToDeduct);
         const lineTotal = price * deductionFromBatch;
+        const gst = calculateGST(lineTotal, product.gst_rate);
 
         await client.query(BILL_QUERIES.CREATE_ITEM, [
           billId,
@@ -230,6 +232,10 @@ export const createBill = asyncHandler(async (req, res) => {
           batch.id,
           batch.cost_price,
           batch.mrp,
+          gst.taxable_amount,
+          gst.gst_rate,
+          gst.cgst_amount,
+          gst.sgst_amount,
         ]);
 
         await client.query(BATCH_QUERIES.UPDATE_QTY, [
@@ -259,6 +265,7 @@ export const createBill = asyncHandler(async (req, res) => {
         if (fallbackBatches.length > 0) {
           const fallbackBatch = fallbackBatches[0];
           const lineTotal = price * remainingToDeduct;
+          const gst = calculateGST(lineTotal, product.gst_rate);
 
           // Insert bill item for the remaining quantity
           await client.query(BILL_QUERIES.CREATE_ITEM, [
@@ -271,6 +278,10 @@ export const createBill = asyncHandler(async (req, res) => {
             fallbackBatch.id,
             fallbackBatch.cost_price,
             fallbackBatch.mrp,
+            gst.taxable_amount,
+            gst.gst_rate,
+            gst.cgst_amount,
+            gst.sgst_amount,
           ]);
 
           // Deduct from the fallback batch (allowing negative)
@@ -303,7 +314,7 @@ export const createBill = asyncHandler(async (req, res) => {
   console.log("productMap==>", productMap);
   // console.log("customer==>", customer);
 
-  // await sendReceipt("9484443735", {
+  // await sendReceipt("", {
   //   invoiceNo: bill.invoice_number,
   //   total: parseFloat(bill.total_amount),
   //   customerName: "xyz",
@@ -412,6 +423,10 @@ export const getBillById = asyncHandler(async (req, res) => {
       line_total: row.line_total,
       mrp: row.mrp,
       sale_type: row.sale_type,
+      gst_rate: row.gst_rate,
+      cgst_amount: row.cgst_amount,
+      sgst_amount: row.sgst_amount,
+      taxable_amount: row.taxable_amount,
     });
 
     return acc;
