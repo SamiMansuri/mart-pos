@@ -6,7 +6,7 @@ export const PRODUCT_QUERIES = {
     return {
       text: `
         SELECT 
-          p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp, p.is_active, p.created_at,
+          p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp, p.is_active, p.created_at, p.gst_rate, p.hsn_code,
           s.stock_qty, lb.batch_no as latest_batch, lb.mrp ${isAdminField}
         FROM products p
         LEFT JOIN (
