@@ -103,6 +103,11 @@ export const createPurchase = asyncHandler(async (req, res) => {
         user_id,
       ]);
 
+      await client.query(
+        "UPDATE products SET gst_rate = $1 WHERE id = $2 AND (gst_rate = 0 OR gst_rate IS NULL)",
+        [parseFloat(item.gst_rate) || 0, item.product_id]
+      );
+
       // Record stock movement
       await client.query(STOCK_QUERIES.RECORD_MOVEMENT, [
         item.product_id,
