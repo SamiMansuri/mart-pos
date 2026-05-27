@@ -13,6 +13,7 @@ import {
   getBillDetailsForAdmin,
   editBill,
   getBillsByCustomer,
+  assignCustomer,
 } from "../controllers/bills.controller.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { allowAdmin } from "../middlewares/allowAdmin.js";
@@ -37,6 +38,7 @@ router.get(
   getBillDetailsForAdmin,
 );
 router.patch("/:bill_id/edit", requireAuth, editBill);
+router.put("/:bill_id/assign-customer", requireAuth, allowCashierOrAdmin, assignCustomer);
 router.get("/customer/:id", requireAuth, getBillsByCustomer);
 
 export default router;
