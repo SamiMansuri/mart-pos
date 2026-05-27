@@ -1050,11 +1050,15 @@ export const getBillsHistory = asyncHandler(async (req, res) => {
       SELECT * FROM (
         SELECT 
           'BILL' as entry_type,
-          id, bill_number, total_amount, payment_status, created_at, created_by, 
-          is_void, payment_method, round_adjustment, sub_total, customer_id, returned_amount,
+          b.id, b.bill_number, b.total_amount, b.payment_status, b.created_at, b.created_by, 
+          b.is_void, b.payment_method, b.round_adjustment, b.sub_total, b.customer_id, b.returned_amount,
           NULL::int as original_bill_id,
-          NULL::text as original_bill_number
-        FROM bills
+          NULL::text as original_bill_number,
+          c.name as customer_name,
+          b.is_credit,
+          b.paid_amount
+        FROM bills b
+        LEFT JOIN customers c ON c.id = b.customer_id
         UNION ALL
         SELECT 
           'RETURN' as entry_type,
@@ -1064,9 +1068,13 @@ export const getBillsHistory = asyncHandler(async (req, res) => {
           false as is_void, r.payment_method, 0 as round_adjustment, 
           -r.total_return_amount as sub_total, b.customer_id, 0 as returned_amount,
           r.bill_id as original_bill_id,
-          b.bill_number as original_bill_number
+          b.bill_number as original_bill_number,
+          c.name as customer_name,
+          false as is_credit,
+          0 as paid_amount
         FROM returns r
         JOIN bills b ON b.id = r.bill_id
+        LEFT JOIN customers c ON c.id = b.customer_id
       ) combined
       ${whereClause}
       ORDER BY created_at DESC
@@ -1259,23 +1267,25 @@ export const getBillDetailsForAdmin = asyncHandler(async (req, res) => {
 export const editBill = asyncHandler(async (req, res) => {
   const { round_adjustment } = req.body;
   const { bill_id } = req.params;
+  const is_admin = req.user.role === 'ADMIN' ? true : false;
 
   if (!round_adjustment)
     throw createHttpError(400, "Round adjustment is required");
 
   const result = await withTransaction(async (client) => {
-    const billRes = await client.query(`SELECT * FROM bills WHERE id = $1`, [
+    const billRes = await client.query(`SELECT * FROM bills WHERE id = $1 ${!is_admin ? "AND business_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date" : ""}`, [
       bill_id,
     ]);
 
-    if (!billRes.rows.length) throw createHttpError(404, "Bill not found");
+    if (!billRes.rows.length) throw createHttpError(404, !is_admin ? "Bill not found or not from today" : "Bill not found");
     const bill = billRes.rows[0];
 
     const newTotalAmount = Number(bill.sub_total) - Number(round_adjustment);
+    const newPaidAmount = Number(bill.paid_amount) - Number(round_adjustment);
 
     await client.query(
-      `UPDATE bills SET round_adjustment = $1, total_amount = $2 WHERE id = $3`,
-      [round_adjustment, newTotalAmount, bill_id],
+      `UPDATE bills SET round_adjustment = $1, total_amount = $2, paid_amount = $3 WHERE id = $4`,
+      [round_adjustment, newTotalAmount, newPaidAmount, bill_id],
     );
 
     await logBillEvent({
@@ -1286,8 +1296,10 @@ export const editBill = asyncHandler(async (req, res) => {
       metadata: {
         old_round_adjustment: bill.round_adjustment,
         old_total_amount: bill.total_amount,
+        old_paid_amount: bill.paid_amount,
         new_round_adjustment: round_adjustment,
         new_total_amount: newTotalAmount,
+        new_paid_amount: newPaidAmount
       },
     });
 
@@ -1296,6 +1308,7 @@ export const editBill = asyncHandler(async (req, res) => {
         ...bill,
         round_adjustment,
         total_amount: newTotalAmount,
+        paid_amount: newPaidAmount,
       },
     };
   });
@@ -1345,3 +1358,113 @@ export const getBillsByCustomer = asyncHandler(async (req, res) => {
     }),
   );
 });
+
+export const assignCustomer = asyncHandler(async (req, res) => {
+  const { customer_id, is_credit, paid_amount } = req.body;
+  const { bill_id } = req.params;
+  const { user_id } = req.user;
+
+  if (!customer_id) throw createHttpError(400, "Customer id is required");
+
+  const result = await withTransaction(async (client) => {
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    const billRes = await client.query(`SELECT * FROM bills WHERE id = $1 FOR UPDATE`, [
+      bill_id,
+    ]);
+
+    const bill = billRes.rows[0];
+
+    if (!bill) throw createHttpError(404, "Bill not found");
+
+
+    // const today = new Date().toISOString().split("T")[0];
+    // if (bill.business_date !== today) {
+    //   throw createHttpError(400, "Can only convert bills from today's date");
+    // }
+    if (bill.is_void) throw createHttpError(400, "Cannot modify voided bill");
+
+    const { rows: custRows } = await client.query(
+      CUSTOMER_QUERIES.GET_CUSTOMER_BY_ID, [customer_id]
+    );
+    const customer = custRows[0];
+    if (!customer) throw createHttpError(404, "Customer not found");
+
+    if (bill.customer_id && bill.customer_id !== customer_id) {
+      throw createHttpError(400, "Bill already has a different customer assigned");
+    }
+
+    if (bill.is_credit && is_credit) {
+      throw createHttpError(400, "Bill is already marked as credit");
+    }
+
+    if (is_credit) {
+      if (paid_amount === null || paid_amount === undefined)
+        throw createHttpError(400, "Paid amount is required");
+
+      if (paid_amount < 0)
+        throw createHttpError(400, "Paid amount cannot be negative");
+
+      const new_credit_amount = Number(bill.total_amount) - Number(paid_amount);
+
+      if (new_credit_amount <= 0)
+        throw createHttpError(400, "Paid amount exceeds or equals total. Use normal payment instead");
+
+      if (customer.credit_limit > 0) {
+        const currentDue = parseFloat(customer.total_due);
+        if (currentDue + new_credit_amount > customer.credit_limit) {
+          throw createHttpError(400, `Credit limit exceeded`);
+        }
+      }
+
+      const { rows: updRows } = await client.query(
+        CUSTOMER_QUERIES.UPDATE_TOTAL_DUE,
+        [new_credit_amount, customer_id],
+      );
+      const balanceAfter = parseFloat(updRows[0].total_due);
+
+      updates.push(
+        `paid_amount = $${idx++}`,
+        `is_credit = $${idx++}`,
+        `payment_status = $${idx++}`,
+      );
+      values.push(paid_amount, true, "UNPAID");
+
+      await client.query(CUSTOMER_QUERIES.INSERT_LEDGER_ENTRY, [
+        customer_id,
+        "CREDIT",
+        new_credit_amount,
+        balanceAfter,
+        bill_id,
+        `Bill ${bill.bill_number}${paid_amount > 0 ? ` (partial, paid: ${paid_amount})` : ""}`,
+        user_id,
+      ]);
+
+      await logBillEvent({
+        client,
+        bill_id: bill.id,
+        eventType: "CONVERTED_TO_CREDIT",
+        performedBy: user_id,
+      });
+    }
+    updates.push(`customer_id = $${idx++}`);
+    values.push(customer_id);
+    values.push(bill_id);
+
+    const { rows: updatedRows } = await client.query(
+      `UPDATE bills SET ${updates.join(", ")} WHERE id = $${idx} RETURNING *`,
+      values,
+    );
+
+    return updatedRows[0];
+  });
+
+  res.status(200).json(getSuccessResponse({
+    data: result,
+    message: "Customer assigned to bill successfully",
+    status: 200
+  }));
+});
+
