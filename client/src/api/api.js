@@ -87,6 +87,11 @@ export const billsApi = {
     }),
   getByCustomer: (id, page = 1, limit = 10) =>
     apiFetch(`/bills/customer/${id}?page=${page}&limit=${limit}`),
+  assignCustomer: (id, data) =>
+    apiFetch(`/bills/${id}/assign-customer`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 };
 
 export const productsApi = {
