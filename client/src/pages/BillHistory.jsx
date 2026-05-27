@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { billsApi } from '../api/api';
+import { billsApi, customersApi } from '../api/api';
 import {
   Box,
   Typography,
@@ -25,6 +25,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Autocomplete,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -48,13 +51,30 @@ const BillHistory = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editValue, setEditValue] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [assignCustomerOpen, setAssignCustomerOpen] = useState(false);
+  const [assignCustomerData, setAssignCustomerData] = useState({
+    customer_id: '',
+    is_credit: false,
+    paid_amount: '',
+  });
+  const [customers, setCustomers] = useState([]);
 
   const user = getUserInfo();
   const limit = 100;
 
   useEffect(() => {
     fetchBillsHistory();
+    fetchCustomers();
   }, [page, filterDate]); // Re-fetch on date change or page change
+
+  const fetchCustomers = async () => {
+    try {
+      const response = await customersApi.getAll();
+      setCustomers(response || []);
+    } catch (error) {
+      console.error('Failed to fetch customers:', error);
+    }
+  };
 
   // Handle search with a slight delay or on enter
   const handleSearch = (e) => {
@@ -102,12 +122,53 @@ const BillHistory = () => {
     if (selectedBill) {
       setEditValue(selectedBill.round_adjustment || 0);
       setEditDialogOpen(true);
+      setAnchorEl(null);
     }
   };
 
   const handleEditClose = () => {
     setEditDialogOpen(false);
     setEditValue(0);
+    setSelectedBill(null);
+  };
+
+  const handleAssignCustomerOpen = () => {
+    if (selectedBill) {
+      setAssignCustomerData({
+        customer_id: selectedBill.customer_id || '',
+        is_credit: selectedBill.is_credit || false,
+        paid_amount: selectedBill.is_credit ? selectedBill.paid_amount || '' : '',
+      });
+      setAssignCustomerOpen(true);
+      setAnchorEl(null);
+    }
+  };
+
+  const handleAssignCustomerClose = () => {
+    setAssignCustomerOpen(false);
+    setSelectedBill(null);
+  };
+
+  const handleAssignCustomerSave = async () => {
+    if (!assignCustomerData.customer_id) {
+      alert('Customer is required');
+      return;
+    }
+    try {
+      setSaving(true);
+      await billsApi.assignCustomer(selectedBill.id, {
+        customer_id: assignCustomerData.customer_id,
+        is_credit: assignCustomerData.is_credit,
+        paid_amount: assignCustomerData.is_credit ? parseFloat(assignCustomerData.paid_amount || 0) : 0,
+      });
+      alert('Customer assigned successfully');
+      handleAssignCustomerClose();
+      fetchBillsHistory();
+    } catch (err) {
+      alert(err?.error?.message || err.message || 'Failed to assign customer');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEditSave = async () => {
@@ -116,10 +177,10 @@ const BillHistory = () => {
       await billsApi.editBill(selectedBill.id, {
         round_adjustment: parseFloat(editValue),
       });
-      setEditDialogOpen(false);
+      handleEditClose();
       fetchBillsHistory();
     } catch (err) {
-      alert(err.message || 'Failed to update bill');
+      alert(err?.error?.message || 'Failed to update bill');
     } finally {
       setSaving(false);
     }
@@ -278,6 +339,11 @@ const BillHistory = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="subtitle2" fontWeight={700}>
+                      Customer
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="subtitle2" fontWeight={700}>
                       Subtotal
                     </Typography>
                   </TableCell>
@@ -323,6 +389,11 @@ const BillHistory = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
+                        {bill.customer_name || '-'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
                         {formatCurrency(bill.sub_total || 0)}
                       </Typography>
                     </TableCell>
@@ -347,8 +418,8 @@ const BillHistory = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={bill.payment_status || 'CASH'}
-                        color={getPaymentStatusColor(bill.payment_status)}
+                        label={bill.is_credit ? 'CREDIT' : bill.payment_status || 'CASH'}
+                        color={bill.is_credit ? 'warning' : getPaymentStatusColor(bill.payment_status)}
                         size="small"
                       />
                     </TableCell>
@@ -396,6 +467,9 @@ const BillHistory = () => {
             onClose={handleMenuClose}
           >
             <MenuItem onClick={handleEditOpen}>Edit Bill</MenuItem>
+            {!selectedBill?.is_void && (
+              <MenuItem onClick={handleAssignCustomerOpen}>Assign Customer</MenuItem>
+            )}
             <MenuItem
               onClick={() => {
                 navigate('/cashier/return', {
@@ -433,10 +507,7 @@ const BillHistory = () => {
 
           <Dialog
             open={editDialogOpen}
-            onClose={() => {
-              handleEditClose();
-              handleMenuClose();
-            }}
+            onClose={handleEditClose}
             fullWidth
             maxWidth="xs"
           >
@@ -467,23 +538,97 @@ const BillHistory = () => {
             </DialogContent>
             <DialogActions>
               <Button
-                onClick={() => {
-                  handleEditClose();
-                  handleMenuClose();
-                }}
+                onClick={handleEditClose}
                 disabled={saving}
               >
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  handleEditSave();
-                  handleMenuClose();
-                }}
+                onClick={handleEditSave}
                 variant="contained"
                 disabled={saving}
               >
                 {saving ? <CircularProgress size={24} /> : 'Save Changes'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Dialog
+            open={assignCustomerOpen}
+            onClose={handleAssignCustomerClose}
+            fullWidth
+            maxWidth="xs"
+          >
+            <DialogTitle>Assign Customer - {selectedBill?.bill_number}</DialogTitle>
+            <DialogContent>
+              <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {selectedBill?.customer_id ? (
+                  <Typography variant="body1" fontWeight={600}>
+                    Customer: {customers.find(c => c.id === selectedBill.customer_id)?.name || 'Unknown'}
+                  </Typography>
+                ) : (
+                  <Autocomplete
+                    options={customers}
+                    getOptionLabel={(option) => `${option.name} (${option.phone})`}
+                    value={customers.find((c) => c.id === assignCustomerData.customer_id) || null}
+                    onChange={(_, newValue) =>
+                      setAssignCustomerData({
+                        ...assignCustomerData,
+                        customer_id: newValue ? newValue.id : '',
+                      })
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} label="Select Customer" required />
+                    )}
+                  />
+                )}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Switch
+                    checked={assignCustomerData.is_credit}
+                    onChange={(e) =>
+                      setAssignCustomerData({
+                        ...assignCustomerData,
+                        is_credit: e.target.checked,
+                      })
+                    }
+                    disabled={selectedBill?.is_credit}
+                  />
+                  <Typography>Is Credit?</Typography>
+                </Box>
+                {assignCustomerData.is_credit && (
+                  <TextField
+                    fullWidth
+                    label="Paid Amount"
+                    type="number"
+                    value={assignCustomerData.paid_amount}
+                    onChange={(e) =>
+                      setAssignCustomerData({
+                        ...assignCustomerData,
+                        paid_amount: e.target.value,
+                      })
+                    }
+                    disabled={selectedBill?.is_credit}
+                    inputProps={{ min: 0, step: '0.01' }}
+                    required
+                  />
+                )}
+                {assignCustomerData.is_credit && (
+                  <Typography variant="body2" color="text.secondary">
+                    Total Bill Amount: {formatCurrency(selectedBill?.total_amount || 0)}
+                  </Typography>
+                )}
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleAssignCustomerClose} disabled={saving}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignCustomerSave}
+                variant="contained"
+                disabled={saving}
+              >
+                {saving ? <CircularProgress size={24} /> : 'Assign Customer'}
               </Button>
             </DialogActions>
           </Dialog>
