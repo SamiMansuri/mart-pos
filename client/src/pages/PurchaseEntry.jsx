@@ -305,7 +305,7 @@ const PurchaseEntry = () => {
   // Item form state (always visible, reset after add)
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [itemForm, setItemForm] = useState({
-    batch_no: "INITIAL", qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0",
+    qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0",
   });
 
   // Modals
@@ -322,7 +322,6 @@ const PurchaseEntry = () => {
   const handleProductSelect = (product) => {
     setSelectedProduct(product);
     setItemForm({
-      batch_no: "INITIAL",
       qty: "1",
       cost_price: "",
       mrp: "",
@@ -348,7 +347,6 @@ const PurchaseEntry = () => {
       id: Date.now().toString(),
       product_id: selectedProduct.id,
       product_name: selectedProduct.name,
-      batch_no: itemForm.batch_no || "INITIAL",
       expiry_date: itemForm.expiry_date || null,
       qty: parseFloat(itemForm.qty),
       cost_price: parseFloat(itemForm.cost_price),
@@ -359,7 +357,7 @@ const PurchaseEntry = () => {
 
     // Reset item form but keep product selected for fast entry of same product
     setSelectedProduct(null);
-    setItemForm({ batch_no: "INITIAL", qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0" });
+    setItemForm({ qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0" });
     setStatus({ type: "", message: "" });
   };
 
@@ -395,7 +393,6 @@ const PurchaseEntry = () => {
         notes: notes || null,
         items: items.map((i) => ({
           product_id: i.product_id,
-          batch_no: i.batch_no,
           expiry_date: i.expiry_date,
           qty: i.qty,
           cost_price: i.cost_price,
@@ -522,11 +519,7 @@ const PurchaseEntry = () => {
             {selectedProduct && (
               <Box sx={{ bgcolor: "#fafafa", border: "1px solid #e8e8e8", borderRadius: 1, p: 1.5 }}>
                 <Grid container spacing={1.5} alignItems="flex-end">
-                  <Grid item xs={6} sm={4} md={2}>
-                    <TextField fullWidth size="small" label="Batch No" value={itemForm.batch_no}
-                      onChange={handleFormChange("batch_no")} />
-                  </Grid>
-                  <Grid item xs={4} sm={3} md={1}>
+                  <Grid item xs={4} sm={3} md={2}>
                     <TextField sx={{ width: '80px' }} size="small" label="Qty *" type="number" value={itemForm.qty}
                       onChange={handleFormChange("qty")} inputProps={{ min: "0.01", step: "0.01" }} />
                   </Grid>
@@ -604,7 +597,7 @@ const PurchaseEntry = () => {
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["#", "Product", "Batch", "Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "CGST", "SGST", "Total", ""].map((h) => (
+                {["#", "Product", "Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "CGST", "SGST", "Total", ""].map((h) => (
                   <TableCell key={h} sx={headCellStyle}
                     align={["Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "CGST", "SGST", "Total"].includes(h) ? "right" : "left"}>
                     {h}
@@ -624,7 +617,6 @@ const PurchaseEntry = () => {
                   <TableRow key={item.id} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
                     <TableCell sx={cellStyle}>{idx + 1}</TableCell>
                     <TableCell sx={{ ...cellStyle, fontWeight: 500 }}>{item.product_name}</TableCell>
-                    <TableCell sx={{ ...cellStyle, color: "text.secondary" }}>{item.batch_no}</TableCell>
                     <TableCell sx={cellStyle} align="right">{item.qty}</TableCell>
                     <TableCell sx={cellStyle} align="right">{fmt(item.cost_price)}</TableCell>
                     <TableCell sx={cellStyle} align="right">{item.mrp ? fmt(item.mrp) : "—"}</TableCell>

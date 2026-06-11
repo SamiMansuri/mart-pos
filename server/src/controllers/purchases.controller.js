@@ -77,10 +77,16 @@ export const createPurchase = asyncHandler(async (req, res) => {
 
     // Create items + update stock batches
     for (const item of processedItems) {
+      const seqResult = await client.query(`SELECT nextval('batch_seq')`);
+      const seq = String(seqResult.rows[0].nextval).padStart(4, '0'); // "0001", "0042"
+      const d = new Date(invoice_date);
+      const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+      const batch_no = `BAT-${dateStr}-${item.product_id}-${seq}`;
+
       await client.query(PURCHASE_QUERIES.CREATE_ITEM, [
         purchase.id,
         item.product_id,
-        item.batch_no,
+        batch_no,
         item.expiry_date || null,
         parseFloat(item.qty),
         parseFloat(item.cost_price),
@@ -93,15 +99,22 @@ export const createPurchase = asyncHandler(async (req, res) => {
       ]);
 
       // Upsert batch — same as stock entry
-      await client.query(BATCH_QUERIES.UPSERT, [
+      const { rows: batchRows } = await client.query(BATCH_QUERIES.UPSERT, [
         item.product_id,
-        item.batch_no,
+        batch_no,
         parseFloat(item.qty),
         parseFloat(item.cost_price),
         parseFloat(item.mrp) || 0,
         item.expiry_date || null,
         user_id,
       ]);
+      
+      const batch_id = batchRows[0].id;
+
+      await client.query(
+        "UPDATE products SET gst_rate = $1 WHERE id = $2 AND (gst_rate = 0 OR gst_rate IS NULL)",
+        [parseFloat(item.gst_rate) || 0, item.product_id]
+      );
 
       await client.query(
         "UPDATE products SET gst_rate = $1 WHERE id = $2 AND (gst_rate = 0 OR gst_rate IS NULL)",
@@ -115,7 +128,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
         "IN",
         `PURCHASE-${purchase.id}`,
         user_id,
-        null,
+        batch_id,
       ]);
     }
 
