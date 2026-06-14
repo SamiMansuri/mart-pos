@@ -314,7 +314,7 @@ export const createBill = asyncHandler(async (req, res) => {
   console.log("productMap==>", productMap);
   // console.log("customer==>", customer);
 
-  // await sendReceipt("9484443735", {
+  // await sendReceipt("", {
   //   invoiceNo: bill.invoice_number,
   //   total: parseFloat(bill.total_amount),
   //   customerName: "xyz",
