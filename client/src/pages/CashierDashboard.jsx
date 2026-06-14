@@ -451,13 +451,36 @@ const CashierDashboard = () => {
           invoice_number: invoiceNumber,
           date: date,
           payment_method: paymentMethod,
-          items: cartItems.map((item) => ({
-            name: item.name,
-            barcode: item.barcode,
-            qty: item.quantity,
-            price: parseFloat(item.selling_price).toFixed(2),
-            total: (item.selling_price * item.quantity).toFixed(2),
-          })),
+          items: cartItems.map((item) => {
+            const qty = parseFloat(item.quantity) || 0;
+            const price = parseFloat(item.selling_price) || 0;
+            const total = price * qty;
+            const gstRate = parseFloat(item.gst_rate) || 0;
+            
+            let taxable_amount = total;
+            let cgst_amount = 0;
+            let sgst_amount = 0;
+
+            if (gstRate > 0) {
+              taxable_amount = total / (1 + gstRate / 100);
+              const gst_amount = total - taxable_amount;
+              cgst_amount = gst_amount / 2;
+              sgst_amount = gst_amount / 2;
+            }
+
+            return {
+              name: item.name,
+              barcode: item.barcode,
+              qty: qty,
+              price: price.toFixed(2),
+              total: total.toFixed(2),
+              gst_rate: gstRate,
+              taxable_amount: taxable_amount.toFixed(2),
+              cgst_amount: cgst_amount.toFixed(2),
+              sgst_amount: sgst_amount.toFixed(2),
+              line_total: total.toFixed(2),
+            };
+          }),
           total: totalAmount.toFixed(2),
           lucky_draw: luckyDraw
             ? {
