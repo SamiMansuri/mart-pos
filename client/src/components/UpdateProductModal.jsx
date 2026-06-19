@@ -254,6 +254,7 @@ const UpdateProductModal = ({ open, onClose, productId, onProductUpdated }) => {
                     <MenuItem value="5">5%</MenuItem>
                     <MenuItem value="12">12%</MenuItem>
                     <MenuItem value="18">18%</MenuItem>
+                    <MenuItem value="40">40%</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
