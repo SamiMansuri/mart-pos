@@ -282,6 +282,7 @@ const AddProduct = () => {
                   <MenuItem value="5">5% (Packaged Food)</MenuItem>
                   <MenuItem value="12">12% (Processed Food)</MenuItem>
                   <MenuItem value="18">18% (Other)</MenuItem>
+                  <MenuItem value="40">40%</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
