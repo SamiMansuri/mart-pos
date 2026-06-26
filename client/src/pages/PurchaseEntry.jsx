@@ -153,6 +153,7 @@ const AddProductModal = ({ open, onClose, onAdded, initialName }) => {
                 <MenuItem value="5">5%</MenuItem>
                 <MenuItem value="12">12%</MenuItem>
                 <MenuItem value="18">18%</MenuItem>
+                <MenuItem value="40">40%</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -543,6 +544,7 @@ const PurchaseEntry = () => {
                         <MenuItem value="5">5%</MenuItem>
                         <MenuItem value="12">12%</MenuItem>
                         <MenuItem value="18">18%</MenuItem>
+                        <MenuItem value="40">40%</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
