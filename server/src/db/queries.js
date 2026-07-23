@@ -370,19 +370,37 @@ export const PURCHASE_QUERIES = {
   GET_ALL: `
     SELECT 
       p.*,
-      s.name AS supplier_name
+      s.name AS supplier_name,
+      COALESCE(SUM(pp.amount), 0) AS total_paid,
+      (p.total_amount - COALESCE(SUM(pp.amount), 0)) AS amount_due,
+      CASE 
+        WHEN COALESCE(SUM(pp.amount), 0) = 0 THEN 'unpaid'
+        WHEN COALESCE(SUM(pp.amount), 0) >= p.total_amount THEN 'paid'
+        ELSE 'partial'
+      END AS payment_status
     FROM purchases p
     LEFT JOIN suppliers s ON s.id = p.supplier_id
+    LEFT JOIN purchase_payments pp ON pp.purchase_id = p.id
+    GROUP BY p.id, s.name
     ORDER BY p.created_at DESC
   `,
   GET_BY_ID: `
     SELECT 
       p.*,
       s.name AS supplier_name,
-      s.gstin AS supplier_gstin
+      s.gstin AS supplier_gstin,
+      COALESCE(SUM(pp.amount), 0) AS total_paid,
+      (p.total_amount - COALESCE(SUM(pp.amount), 0)) AS amount_due,
+      CASE 
+        WHEN COALESCE(SUM(pp.amount), 0) = 0 THEN 'unpaid'
+        WHEN COALESCE(SUM(pp.amount), 0) >= p.total_amount THEN 'paid'
+        ELSE 'partial'
+      END AS payment_status
     FROM purchases p
     LEFT JOIN suppliers s ON s.id = p.supplier_id
+    LEFT JOIN purchase_payments pp ON pp.purchase_id = p.id
     WHERE p.id = $1
+    GROUP BY p.id, s.name, s.gstin
   `,
   GET_ITEMS: `
     SELECT 
@@ -401,5 +419,30 @@ export const PURCHASE_QUERIES = {
     INSERT INTO purchase_items (purchase_id, product_id, batch_no, expiry_date, qty, cost_price, mrp, taxable_amount, gst_rate, cgst_amount, sgst_amount, total_amount)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING *
+  `,
+  GET_FOR_UPDATE: `
+    SELECT * FROM purchases WHERE id = $1 FOR UPDATE
+  `,
+};
+
+export const PURCHASE_PAYMENT_QUERIES = {
+  CREATE: `
+    INSERT INTO purchase_payments (purchase_id, amount, recorded_by, payer_name, note)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING *
+  `,
+  GET_TOTAL_PAID: `
+    SELECT COALESCE(SUM(amount), 0) AS total_paid
+    FROM purchase_payments
+    WHERE purchase_id = $1
+  `,
+  GET_BY_PURCHASE: `
+    SELECT 
+      pp.*,
+      u.name AS recorded_by_name
+    FROM purchase_payments pp
+    LEFT JOIN users u ON u.id = pp.recorded_by
+    WHERE pp.purchase_id = $1
+    ORDER BY pp.created_at DESC
   `,
 };

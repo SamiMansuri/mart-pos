@@ -15,6 +15,7 @@ import {
   Button,
   CircularProgress,
   Alert,
+  Chip,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -51,6 +52,18 @@ const PurchasesList = () => {
 
   const handleView = (purchase) => {
     navigate(`/admin/purchases/${purchase.id}`);
+  };
+
+  const renderStatusChip = (status) => {
+    switch (status) {
+      case 'paid':
+        return <Chip label="Paid" color="success" size="small" sx={{ fontWeight: 600 }} />;
+      case 'partial':
+        return <Chip label="Partial" color="warning" size="small" sx={{ fontWeight: 600 }} />;
+      case 'unpaid':
+      default:
+        return <Chip label="Unpaid" color="error" size="small" sx={{ fontWeight: 600 }} />;
+    }
   };
 
   if (error) {
@@ -127,13 +140,14 @@ const PurchasesList = () => {
               <TableCell align="right">Taxable</TableCell>
               <TableCell align="right">GST</TableCell>
               <TableCell align="right">Total Amount</TableCell>
+              <TableCell align="center">Payment Status</TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {purchases.length === 0 && !loading ? (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
                   <Typography variant="body2" color="text.secondary">
                     No purchases found
                   </Typography>
@@ -182,6 +196,9 @@ const PurchasesList = () => {
                     <Typography variant="body2" fontWeight={600} color="primary.main">
                       ₹{parseFloat(purchase.total_amount || 0).toFixed(2)}
                     </Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    {renderStatusChip(purchase.payment_status)}
                   </TableCell>
                   <TableCell align="center">
                     <IconButton
