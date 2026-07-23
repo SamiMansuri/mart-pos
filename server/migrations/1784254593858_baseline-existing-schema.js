@@ -1,8 +1,8 @@
 /* eslint-disable camelcase */
 
-exports.shorthands = undefined;
+export const shorthands = undefined;
 
-exports.up = (pgm) => {
+export const up = (pgm) => {
   pgm.sql(`
     -- Extensions
     CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
@@ -653,7 +653,7 @@ exports.up = (pgm) => {
   `);
 };
 
-exports.down = (pgm) => {
+export const down = (pgm) => {
   pgm.sql(`
     DROP TABLE IF EXISTS public.return_items CASCADE;
     DROP TABLE IF EXISTS public.returns CASCADE;

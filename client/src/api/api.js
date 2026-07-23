@@ -229,4 +229,9 @@ export const purchasesApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  recordPayment: (purchaseId, paymentData) =>
+    apiFetch(`/purchases/${purchaseId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    }),
 };

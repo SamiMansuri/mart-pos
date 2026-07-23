@@ -1,5 +1,5 @@
 import createHttpError from "http-errors";
-import { BATCH_QUERIES, PURCHASE_QUERIES, STOCK_QUERIES } from "../db/queries.js";
+import { BATCH_QUERIES, PURCHASE_QUERIES, PURCHASE_PAYMENT_QUERIES, STOCK_QUERIES } from "../db/queries.js";
 import { asyncHandler } from "../utils/asynHandler.util.js";
 import { getSuccessResponse } from "../utils/response.util.js";
 import { withTransaction } from "../utils/transaction.util.js";
@@ -27,10 +27,76 @@ export const getPurchaseById = asyncHandler(async (req, res) => {
       purchase_id,
     ]);
 
-    return { ...purchaseRows[0], items };
+    const { rows: payments } = await client.query(
+      PURCHASE_PAYMENT_QUERIES.GET_BY_PURCHASE,
+      [purchase_id],
+    );
+
+    return { ...purchaseRows[0], items, payments };
   });
 
   res.status(200).json(getSuccessResponse({ data: result, status: 200 }));
+});
+
+export const recordPurchasePayment = asyncHandler(async (req, res) => {
+  const { purchase_id } = req.params;
+  const { amount, payer_name, note } = req.body;
+  const { user_id } = req.user;
+
+  const numericAmount = parseFloat(amount);
+  if (isNaN(numericAmount) || numericAmount <= 0) {
+    throw createHttpError(400, "Payment amount must be greater than 0");
+  }
+
+  const result = await withTransaction(async (client) => {
+    const { rows: purchaseRows } = await client.query(
+      PURCHASE_QUERIES.GET_FOR_UPDATE,
+      [purchase_id],
+    );
+
+    if (!purchaseRows.length) {
+      throw createHttpError(404, "Purchase not found");
+    }
+
+    const purchase = purchaseRows[0];
+    const totalAmount = parseFloat(purchase.total_amount || 0);
+
+    const { rows: sumRows } = await client.query(
+      PURCHASE_PAYMENT_QUERIES.GET_TOTAL_PAID,
+      [purchase_id],
+    );
+
+    const existingTotalPaid = parseFloat(sumRows[0]?.total_paid || 0);
+    const amountDue = totalAmount - existingTotalPaid;
+
+    if (Number(numericAmount.toFixed(2)) > Number(amountDue.toFixed(2))) {
+      throw createHttpError(
+        400,
+        `Payment amount (${numericAmount.toFixed(2)}) exceeds remaining amount due (${amountDue.toFixed(2)})`,
+      );
+    }
+
+    const { rows: paymentRows } = await client.query(
+      PURCHASE_PAYMENT_QUERIES.CREATE,
+      [
+        purchase_id,
+        parseFloat(numericAmount.toFixed(2)),
+        user_id,
+        payer_name || null,
+        note || null,
+      ],
+    );
+
+    return paymentRows[0];
+  });
+
+  res.status(201).json(
+    getSuccessResponse({
+      data: result,
+      message: "Payment recorded successfully",
+      status: 201,
+    }),
+  );
 });
 
 export const createPurchase = asyncHandler(async (req, res) => {

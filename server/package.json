@@ -12,7 +12,9 @@
     "dev": "nodemon server.js",
     "migrate:create": "node-pg-migrate create",
     "migrate:up": "node --env-file=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js up",
-    "migrate:down": "node --env-file=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js down"
+    "migrate:down": "node --env-file=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js down",
+    "migrate:stage": "node --env-file=.env.stage node_modules/node-pg-migrate/bin/node-pg-migrate.js up",
+    "migrate:prod": "node --env-file=.env.prod node_modules/node-pg-migrate/bin/node-pg-migrate.js up"
   },
   "dependencies": {
     "axios": "^1.15.2",
