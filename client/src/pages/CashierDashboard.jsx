@@ -61,6 +61,9 @@ const CashierDashboard = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
+  
+  // Marketing Phone Capture
+  const [customerPhoneInput, setCustomerPhoneInput] = useState('');
 
   // Credit Bill State
   const [isCredit, setIsCredit] = useState(false);
@@ -540,6 +543,7 @@ const CashierDashboard = () => {
         }),
         ...(!isCredit &&
           selectedCustomer && { customer_id: selectedCustomer.id }),
+        customer_phone: customerPhoneInput || undefined,
         participate_in_lucky_draw: !!(
           activeCampaign &&
           eligibleAmount >= parseFloat(activeCampaign.min_bill_amount) &&
@@ -586,7 +590,7 @@ Best of luck!`;
 
         console.log('message===>', message);
 
-        let phone = selectedCustomer.phone.replace(/\\D/g, '');
+        let phone = selectedCustomer.phone.replace(/\D/g, '');
         if (phone.length === 10) {
           phone = '91' + phone;
         }
@@ -604,6 +608,7 @@ Best of luck!`;
       setSkipLuckyDraw(false);
       setIsAddingPhone(false);
       setNewPhoneInput('');
+      setCustomerPhoneInput('');
       setPaidAmount('');
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
     } catch (err) {
@@ -1554,6 +1559,18 @@ Best of luck!`;
                 gap: 2,
               }}
             >
+              <TextField
+                fullWidth
+                size="small"
+                label="Customer Phone"
+                placeholder="10-digit number"
+                value={customerPhoneInput}
+                onChange={(e) =>
+                  setCustomerPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 15))
+                }
+                FormHelperTextProps={{ sx: { m: 0, mt: 0.5, fontSize: '0.7rem' } }}
+              />
+
               <Button
                 fullWidth
                 variant="outlined"

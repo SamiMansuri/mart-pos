@@ -29,6 +29,7 @@ const CreateBill = () => {
     const [items, setItems] = useState([{ product_id: '', quantity: 1 }]);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: '', message: '' });
+    const [customerPhone, setCustomerPhone] = useState('');
 
     const handleItemChange = (index, field, value) => {
         const newItems = [...items];
@@ -58,7 +59,14 @@ const CreateBill = () => {
         }
 
         try {
-            await billsApi.create({ items });
+            await billsApi.create({
+                items,
+                customer_phone: customerPhone ? customerPhone : undefined,
+                payment_method: "CASH", // defaulting since not present in this basic UI
+                idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                business_date: new Date().toISOString().split('T')[0],
+                round_adjustment: 0,
+            });
             setStatus({ type: 'success', message: 'Bill created successfully' });
             setTimeout(() => navigate('/bills'), 1500);
         } catch (err) {
@@ -165,6 +173,15 @@ const CreateBill = () => {
                         )}
 
                         <Box sx={{ mb: 3 }}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                label="Customer Phone (Optional)"
+                                value={customerPhone}
+                                onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 15))}
+                                disabled={loading}
+                                sx={{ mb: 2 }}
+                            />
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                 <Typography variant="body2" color="text.secondary">
                                     Total Items

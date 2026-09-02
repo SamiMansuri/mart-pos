@@ -35,8 +35,19 @@ export const createBill = asyncHandler(async (req, res) => {
     customer_id = null,
     paid_amount = null,
     participate_in_lucky_draw = false,
+    customer_phone,
   } = req.body;
   const { user_id } = req.user;
+
+  // Normalize phone number (strip spaces/dashes/symbols)
+  let normalizedPhone = null;
+  if (customer_phone) {
+    const digitsOnly = customer_phone.replace(/\D/g, "");
+    if (digitsOnly.length >= 10) {
+      // If no country code, default to 91 (India)
+      normalizedPhone = digitsOnly.length === 10 ? `91${digitsOnly}` : digitsOnly;
+    }
+  }
 
   if (!idempotency_key)
     throw createHttpError(400, "Idempotency key is required");
@@ -158,6 +169,7 @@ export const createBill = asyncHandler(async (req, res) => {
         round_adjustment, // $9
         customer_id, // $10
         paid_amount, // $11
+        normalizedPhone, // $12
       ]);
     } else {
       billRes = await client.query(BILL_QUERIES.CREATE, [
@@ -170,6 +182,7 @@ export const createBill = asyncHandler(async (req, res) => {
         business_date,
         subTotal,
         round_adjustment,
+        normalizedPhone,
       ]);
     }
 
@@ -320,7 +333,7 @@ export const createBill = asyncHandler(async (req, res) => {
   //   customerName: "xyz",
   // }).catch((err) => console.error("[WhatsApp] Receipt failed:", err));
 
-  if (isNew && customer_id && participate_in_lucky_draw) {
+  if (isNew && (customer_id) && participate_in_lucky_draw) {
     // Pass normalizedItems and productMap — already built in the transaction above.
     // generateLuckyDrawEntries reuses productMap so no extra DB calls are made.
     luckyDrawResult = await generateLuckyDrawEntries({
