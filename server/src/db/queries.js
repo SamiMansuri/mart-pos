@@ -160,9 +160,9 @@ export const BILL_QUERIES = {
       bill_number, total_amount, payment_method, idempotency_key,
       created_by, payment_status, invoice_number, business_date,
       sub_total, round_adjustment,
-      is_credit, customer_id, paid_amount
+      is_credit, customer_id, paid_amount, customer_phone
     )
-    VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7, $8, $9, false, NULL, $2)
+    VALUES ($1, $2, $3, $4, $5, 'PAID', $6, $7, $8, $9, false, NULL, $2, $10)
     RETURNING *
   `,
   CREATE_ITEM: `
@@ -194,7 +194,7 @@ export const BILL_QUERIES = {
        p.barcode AS product_barcode,
        p.sale_type,
        c.name AS customer_name,
-       c.phone AS customer_phone,
+       COALESCE(b.customer_phone, c.phone) AS customer_phone,
        c.total_due as customer_total_due,
        b.customer_id as customer_id,
        bi.gst_rate,
@@ -211,9 +211,9 @@ export const BILL_QUERIES = {
       bill_number, total_amount, payment_method, idempotency_key,
       created_by, payment_status, invoice_number, business_date,
       sub_total, round_adjustment,
-      is_credit, customer_id, paid_amount
+      is_credit, customer_id, paid_amount, customer_phone
     )
-    VALUES ($1, $2, $3, $4, $5, 'UNPAID', $6, $7, $8, $9, true, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, 'UNPAID', $6, $7, $8, $9, true, $10, $11, $12)
     RETURNING *
   `,
   GET_BY_CUSTOMER_PAGINATED: `
