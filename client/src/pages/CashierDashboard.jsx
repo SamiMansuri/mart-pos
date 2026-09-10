@@ -519,6 +519,15 @@ const CashierDashboard = () => {
       return;
     }
 
+    const phoneToUse = (selectedCustomer && selectedCustomer.phone) || customerPhoneInput;
+    if (!phoneToUse || phoneToUse.replace(/\D/g, '').length === 0) {
+      setStatus({
+        type: 'error',
+        message: 'A customer phone number is required to checkout',
+      });
+      return;
+    }
+
     setProcessing(true);
     setStatus({ type: '', message: '' });
 
@@ -543,7 +552,7 @@ const CashierDashboard = () => {
         }),
         ...(!isCredit &&
           selectedCustomer && { customer_id: selectedCustomer.id }),
-        customer_phone: customerPhoneInput || undefined,
+        customer_phone: phoneToUse,
         participate_in_lucky_draw: !!(
           activeCampaign &&
           eligibleAmount >= parseFloat(activeCampaign.min_bill_amount) &&
@@ -1561,9 +1570,10 @@ Best of luck!`;
             >
               <TextField
                 fullWidth
+                required
                 size="small"
                 label="Customer Phone"
-                placeholder="10-digit number"
+                placeholder="Phone number"
                 value={customerPhoneInput}
                 onChange={(e) =>
                   setCustomerPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 15))
