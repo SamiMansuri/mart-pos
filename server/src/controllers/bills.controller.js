@@ -43,8 +43,8 @@ export const createBill = asyncHandler(async (req, res) => {
   let normalizedPhone = null;
   if (customer_phone) {
     const digitsOnly = customer_phone.replace(/\D/g, "");
-    if (digitsOnly.length >= 10) {
-      // If no country code, default to 91 (India)
+    if (digitsOnly.length > 0) {
+      // If no country code, default to 91 (India) if exactly 10 digits
       normalizedPhone = digitsOnly.length === 10 ? `91${digitsOnly}` : digitsOnly;
     }
   }
@@ -52,6 +52,8 @@ export const createBill = asyncHandler(async (req, res) => {
   if (!idempotency_key)
     throw createHttpError(400, "Idempotency key is required");
   if (!items?.length) throw createHttpError(400, "Cart is empty");
+  if (!normalizedPhone)
+    throw createHttpError(400, "Customer phone number is required");
 
   if (is_credit) {
     if (!customer_id)
