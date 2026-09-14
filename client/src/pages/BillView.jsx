@@ -233,6 +233,16 @@ const BillView = () => {
               }).format(new Date(bill.created_at))}
             </Typography>
           </Box>
+          {bill.customer?.phone && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', '@media print': { display: 'none' } }}>
+              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                Phone:
+              </Typography>
+              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                {bill.customer.phone}
+              </Typography>
+            </Box>
+          )}
         </Box>
 
         <Divider sx={{ borderStyle: 'dashed', borderColor: 'black', my: 1 }} />
