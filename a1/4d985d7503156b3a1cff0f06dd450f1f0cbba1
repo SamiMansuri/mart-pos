@@ -1,0 +1,17 @@
+server/src/controllers/products.controller.js
+  h_67e264807cd63e 208-217
+server/src/db/queries.js
+  h_67e264807cd63e 9,13,61-62,67-69,72-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "2.0.2",
+  "base_commit_sha": "a14d985d7503156b3a1cff0f06dd450f1f0cbba1",
+  "branch": "dev",
+  "prompts": {},
+  "humans": {
+    "h_67e264807cd63e": {
+      "author": "SamiMansuri <samimansuri303@gmail.com>"
+    }
+  }
+}
