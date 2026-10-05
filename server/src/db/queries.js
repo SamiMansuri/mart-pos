@@ -53,7 +53,7 @@ export const PRODUCT_QUERIES = {
         GROUP BY product_id
       ) s ON p.id = s.product_id
       LEFT JOIN product_batches b ON p.id = b.product_id AND b.batch_no = 'INITIAL'
-      WHERE p.barcode = $1
+      WHERE p.barcode = $1 and p.is_active = true
     `;
   },
   GET_BY_ID: (isAdmin) => {
