@@ -205,7 +205,16 @@ export const updateProduct = asyncHandler(async (req, res) => {
     /* Update MRP in the INITIAL batch if provided */
     if (mrp !== undefined) {
       await client.query(
-        `UPDATE product_batches SET mrp = $1 WHERE product_id = $2 AND batch_no = 'INITIAL'`,
+        `UPDATE product_batches
+         SET mrp = $1
+         WHERE product_id = $2
+          AND batch_no = (
+            SELECT batch_no
+            FROM product_batches
+            WHERE product_id = $2
+            ORDER BY created_at DESC
+            LIMIT 1
+          )`,
         [mrp || 0, productId],
       );
     }
