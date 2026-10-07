@@ -1,0 +1,17 @@
+client/src/layouts/Layout.jsx
+  h_67e264807cd63e 41,250-252,258,261,263-267
+client/src/components/StatusBar.jsx
+  h_67e264807cd63e 1-216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "2.0.2",
+  "base_commit_sha": "3f733d040ccd2e8e850e5d85010a026034dc8a5b",
+  "branch": "dev",
+  "prompts": {},
+  "humans": {
+    "h_67e264807cd63e": {
+      "author": "SamiMansuri <samimansuri303@gmail.com>"
+    }
+  }
+}
