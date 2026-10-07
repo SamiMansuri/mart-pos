@@ -38,6 +38,7 @@ import {
 import { isAdmin, isCashier, getUserInfo } from '../utils/auth.utils';
 import { authApi } from '../api/api';
 import { useEffect } from 'react';
+import StatusBar from '../components/StatusBar';
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -159,7 +160,7 @@ const Layout = () => {
   }, [navigate]);
 
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
+    <Box sx={{ textAlign: 'center' }}>
       <Box
         sx={{
           py: 2,
@@ -182,6 +183,7 @@ const Layout = () => {
               component={Link}
               to={item.path}
               selected={getCurrentTab() === item.path}
+              onClick={() => setMobileOpen(false)}
               sx={{
                 '&.Mui-selected': {
                   bgcolor: 'primary.main',
@@ -209,6 +211,7 @@ const Layout = () => {
               component={Link}
               to="/admin/users"
               selected={getCurrentTab() === '/admin/users'}
+              onClick={() => setMobileOpen(false)}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>
                 <PeopleIcon />
@@ -222,6 +225,7 @@ const Layout = () => {
             component={Link}
             to="/change-password"
             selected={getCurrentTab() === '/change-password'}
+            onClick={() => setMobileOpen(false)}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
               <LockIcon />
@@ -243,82 +247,26 @@ const Layout = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="sticky" color="default" elevation={0}>
-        <Toolbar sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          {/* Hamburger Menu - Show on all screens */}
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2 }}
-          >
-            <MenuIcon />
-          </IconButton>
-
-          {/* Logo and Title */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.5,
-              flexGrow: 1,
-            }}
-          >
-            <StoreIcon
-              sx={{ fontSize: { xs: 24, sm: 28 }, color: 'primary.main' }}
-            />
-            <Typography
-              variant="h6"
-              fontWeight={700}
-              color="primary"
-              sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
-            >
-              <Box
-                component="span"
-                sx={{ display: { xs: 'none', sm: 'inline' } }}
-              >
-                Family Mart POS
-              </Box>
-              <Box
-                component="span"
-                sx={{ display: { xs: 'inline', sm: 'none' } }}
-              >
-                Family Mart
-              </Box>
-            </Typography>
-          </Box>
-
-          {/* Desktop Navigation - Specific items moved to drawer */}
-          <Box sx={{ display: { xs: 'none', lg: 'flex' }, gap: 1, mr: 2 }}>
-            {menuItems
-              .filter(item => !['Purchase Entry', 'Purchase History', 'Lucky Draw', 'Reports'].includes(item.text))
-              .map((item) => (
-              <Button
-                key={item.path}
-                component={Link}
-                to={item.path}
-                startIcon={item.icon}
-                variant={getCurrentTab() === item.path ? 'contained' : 'text'}
-                sx={{ whiteSpace: 'nowrap' }}
-              >
-                {item.text}
-              </Button>
-            ))}
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <StatusBar
+        onMenuClick={() => setMobileOpen(true)}
+      />
 
       {/* Drawer */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
-        onClose={handleDrawerToggle}
+        onClose={() => setMobileOpen(false)}
         ModalProps={{
           keepMounted: true, // Better open performance on mobile.
+          slotProps: { backdrop: { invisible: true } },
         }}
-        sx={{
-          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
+        PaperProps={{
+          onMouseLeave: (e) => {
+            if (e.clientY >= 0) {
+              setMobileOpen(false);
+            }
+          },
+          sx: { boxSizing: 'border-box', width: 280 },
         }}
       >
         {drawer}
@@ -329,7 +277,7 @@ const Layout = () => {
         maxWidth="xl"
         sx={{
           flexGrow: 1,
-          py: { xs: 2, sm: 4 },
+          py: { xs: 2, sm: 2 },
           display: 'flex',
           flexDirection: 'column',
         }}

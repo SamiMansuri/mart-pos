@@ -22,5 +22,6 @@ router.use("/customers", customersRouter);
 router.use("/lucky-draw", luckyDrawRouter);
 router.use("/suppliers", supplierRoutes);
 router.use("/purchases", purchaseRoutes);
+router.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
 
 export default router;
