@@ -245,8 +245,18 @@ const Layout = () => {
     </Box>
   );
 
+  const isCashierPage = location.pathname === '/cashier';
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: isCashierPage ? { xs: 'auto', lg: '100dvh' } : 'auto',
+        minHeight: '100vh',
+        overflow: isCashierPage ? { xs: 'visible', lg: 'hidden' } : 'visible',
+      }}
+    >
       <StatusBar
         onMenuClick={() => setMobileOpen(true)}
       />
@@ -276,32 +286,37 @@ const Layout = () => {
         component="main"
         maxWidth="xl"
         sx={{
+          flex: 1,
           flexGrow: 1,
-          py: { xs: 2, sm: 2 },
+          py: isCashierPage ? { xs: 2, lg: 1.5 } : { xs: 2, sm: 2 },
           display: 'flex',
           flexDirection: 'column',
+          minHeight: 0,
+          overflow: isCashierPage ? { xs: 'visible', lg: 'hidden' } : 'visible',
         }}
       >
         <Outlet />
       </Container>
 
-      <Box
-        component="footer"
-        sx={{
-          py: 2,
-          px: 2,
-          mt: 'auto',
-          bgcolor: 'background.paper',
-          borderTop: 1,
-          borderColor: 'divider',
-        }}
-      >
-        <Container maxWidth="xl">
-          <Typography variant="body2" color="text.secondary" align="center">
-            © {new Date().getFullYear()} Family Mart. All rights reserved.
-          </Typography>
-        </Container>
-      </Box>
+      {!isCashierPage && (
+        <Box
+          component="footer"
+          sx={{
+            py: 2,
+            px: 2,
+            mt: 'auto',
+            bgcolor: 'background.paper',
+            borderTop: 1,
+            borderColor: 'divider',
+          }}
+        >
+          <Container maxWidth="xl">
+            <Typography variant="body2" color="text.secondary" align="center">
+              © {new Date().getFullYear()} Family Mart. All rights reserved.
+            </Typography>
+          </Container>
+        </Box>
+      )}
     </Box>
   );
 };
