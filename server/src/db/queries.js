@@ -6,11 +6,11 @@ export const PRODUCT_QUERIES = {
     return {
       text: `
         SELECT 
-          p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp, p.is_active, p.created_at, p.gst_rate, p.hsn_code,
+          p.id, p.name, p.barcode, p.selling_price, p.sale_type, p.is_active, p.created_at, p.gst_rate, p.hsn_code,
           s.stock_qty, lb.batch_no as latest_batch, lb.mrp ${isAdminField}
         FROM products p
         LEFT JOIN (
-          SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price, MAX(mrp) as mrp
+          SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
           FROM product_batches 
           GROUP BY product_id
         ) s ON p.id = s.product_id
@@ -53,21 +53,29 @@ export const PRODUCT_QUERIES = {
         GROUP BY product_id
       ) s ON p.id = s.product_id
       LEFT JOIN product_batches b ON p.id = b.product_id AND b.batch_no = 'INITIAL'
-      WHERE p.barcode = $1
+      WHERE p.barcode = $1 and p.is_active = true
     `;
   },
   GET_BY_ID: (isAdmin) => {
     const fields = isAdmin
-      ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, s.mrp, p.gst_rate, p.hsn_code, p.sale_type"
-      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, s.mrp, p.gst_rate, p.hsn_code, p.sale_type";
+      ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, lb.mrp, p.gst_rate, p.hsn_code, p.sale_type"
+      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, lb.mrp, p.gst_rate, p.hsn_code, p.sale_type";
     return `
       SELECT ${fields} 
       FROM products p 
       LEFT JOIN (
-        SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price, MAX(mrp) as mrp
-        FROM product_batches 
+        SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
+        FROM product_batches
+        WHERE product_id = $1
         GROUP BY product_id
       ) s ON p.id = s.product_id
+      LEFT JOIN LATERAL (
+       SELECT batch_no, mrp
+       FROM product_batches pb
+       WHERE pb.product_id = p.id
+       ORDER BY pb.created_at DESC
+       LIMIT 1
+      ) lb on true
       LEFT JOIN product_batches b ON p.id = b.product_id AND b.batch_no = 'INITIAL'
       WHERE p.id = $1
     `;

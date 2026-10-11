@@ -12,8 +12,6 @@ import {
   CircularProgress,
   TextField,
   InputAdornment,
-  ToggleButtonGroup,
-  ToggleButton,
   Table,
   TableBody,
   TableCell,
@@ -23,8 +21,6 @@ import {
   Autocomplete,
   ListItem,
   ListItemText,
-  FormControlLabel,
-  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -32,11 +28,10 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   ShoppingCart as CartIcon,
-  Money as CashIcon,
-  QrCode2 as UpiIcon,
   PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
 import AddCustomerModal from '../components/AddCustomerModal';
+import BillSummary from '../components/BillSummary';
 
 // ProductCard component removed as it's no longer used in the new layout
 
@@ -418,10 +413,6 @@ const CashierDashboard = () => {
 
   const total = subTotal - Number(roundAdjust || 0);
 
-  const totalItems = cart.reduce(
-    (sum, item) => sum + (parseFloat(item.quantity) || 0),
-    0,
-  );
 
   // Lucky Draw — eligible amount excludes excluded products and round adjustment
   const eligibleAmount =
@@ -509,7 +500,8 @@ const CashierDashboard = () => {
       // and print failure is secondary to transaction completion
     }
   };
-  const handleCheckout = async (shouldPrint = true) => {
+  const handleCheckout = async (options = true) => {
+    const shouldPrint = typeof options === 'boolean' ? options : (options?.print ?? true);
     if (cart.length === 0) return;
     if (isCredit && !selectedCustomer) {
       setStatus({
@@ -519,14 +511,8 @@ const CashierDashboard = () => {
       return;
     }
 
-    const phoneToUse = (selectedCustomer && selectedCustomer.phone) || customerPhoneInput;
-    if (!phoneToUse || phoneToUse.replace(/\D/g, '').length === 0) {
-      setStatus({
-        type: 'error',
-        message: 'A customer phone number is required to checkout',
-      });
-      return;
-    }
+    const rawPhone = customerPhoneInput || (selectedCustomer && selectedCustomer.phone) || '';
+    const phoneToUse = rawPhone.replace(/\D/g, '') || null;
 
     setProcessing(true);
     setStatus({ type: '', message: '' });
@@ -667,6 +653,9 @@ Best of luck!`;
   const handleCustomerCreated = (newCustomer) => {
     setCustomerOptions((prev) => [newCustomer, ...prev]);
     setSelectedCustomer(newCustomer);
+    if (newCustomer?.phone) {
+      setCustomerPhoneInput(newCustomer.phone.replace(/\D/g, '').slice(-10));
+    }
     setAddCustomerModalOpen(false);
   };
 
@@ -679,6 +668,8 @@ Best of luck!`;
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden', // Prevent outer scroll on desktop
+        flex: 1,
+        minHeight: 0,
       }}
     >
       {/* Main Content Area */}
@@ -686,10 +677,11 @@ Best of luck!`;
         sx={{
           display: 'flex',
           flexDirection: { xs: 'column', lg: 'row' },
-          gap: 3,
+          gap: 2.5,
           flexGrow: 1,
           minHeight: 0, // CRITICAL for nested flex scrolling
           overflow: { xs: 'visible', lg: 'hidden' },
+          height: { xs: 'auto', lg: '100%' },
         }}
       >
         {/* Left Section (Cart) */}
@@ -700,6 +692,7 @@ Best of luck!`;
             flexDirection: 'column',
             gap: 2,
             minWidth: 0,
+            minHeight: 0,
             height: '100%',
           }}
         >
@@ -1058,190 +1051,36 @@ Best of luck!`;
           </TableContainer>
         </Box>
 
-        {/* Right Section (30%) - Payment Summary & Actions */}
+        {/* Right Section - Bill Summary */}
         <Box
           sx={{
-            flex: { xs: '1 1 auto', lg: '0 0 30%' },
+            flex: { xs: '1 1 auto', lg: '0 0 440px' },
+            width: { lg: 440 },
+            height: '100%',
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: 0,
-            height: '100%',
           }}
         >
-          <Paper
-            elevation={activeSection === 'BILL_SUMMARY' ? 4 : 1}
-            sx={{
-              p: 3,
-              borderRadius: 3,
-              display: 'flex',
-              flexDirection: 'column',
-              height: '100%',
-              border: '2px solid',
-              borderColor:
-                activeSection === 'BILL_SUMMARY' ? 'primary.main' : 'divider',
-              // transition: 'all 0.2s ease-in-out',
-            }}
-          >
-            <Typography variant="h6" fontWeight={800} gutterBottom>
-              Bill Summary
-            </Typography>
+          <BillSummary
+            customerSlot={
 
-            {/* Lucky Draw Section */}
-            {activeCampaign &&
-              !isCredit &&
-              !skipLuckyDraw &&
-              eligibleAmount >= parseFloat(activeCampaign.min_bill_amount) && (
-                <Box
-                  sx={{
-                    mb: 2,
-                    p: 1.5,
-                    bgcolor: 'rgba(255, 193, 7, 0.08)',
-                    border: '1px solid',
-                    borderColor: 'warning.light',
-                    borderRadius: 2,
+              <>
+                <Autocomplete
+                  fullWidth
+                  options={customerOptions}
+                  getOptionLabel={(option) =>
+                    `${option.name} (${option.phone || 'N/A'})`
+                  }
+                  value={selectedCustomer}
+                  onChange={(_, newValue) => {
+                    setSelectedCustomer(newValue);
+                    if (newValue?.phone) {
+                      setCustomerPhoneInput(newValue.phone.replace(/\D/g, '').slice(-10));
+                    } else if (!newValue) {
+                      setCustomerPhoneInput('');
+                    }
                   }}
-                >
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight={800}
-                    color="warning.dark"
-                    sx={{ mb: 0.5 }}
-                  >
-                    🎟 Lucky Draw Eligible!
-                  </Typography>
-                  {selectedCustomer ? (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      {selectedCustomer.phone ? (
-                        <Box>
-                          <Typography variant="body2" fontWeight={700}>
-                            {selectedCustomer.name} ✓
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {Math.floor(
-                              eligibleAmount /
-                                parseFloat(activeCampaign.min_bill_amount),
-                            )}{' '}
-                            {Math.floor(
-                              eligibleAmount /
-                                parseFloat(activeCampaign.min_bill_amount),
-                            ) === 1
-                              ? 'entry'
-                              : 'entries'}{' '}
-                            will be generated
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <Box sx={{ width: '100%' }}>
-                          <Typography
-                            variant="body2"
-                            color="error.main"
-                            fontWeight={700}
-                          >
-                            ⚠️ No phone number on file.
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: 'block', mb: 1 }}
-                          >
-                            A phone number is required to generate a lucky draw
-                            entry.
-                          </Typography>
-
-                          {isAddingPhone ? (
-                            <Box
-                              sx={{
-                                mt: 1,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 1,
-                              }}
-                            >
-                              <Typography variant="caption" fontWeight={700}>
-                                Enter phone number:
-                              </Typography>
-                              <TextField
-                                size="small"
-                                placeholder="10-digit phone"
-                                value={newPhoneInput}
-                                onChange={(e) =>
-                                  setNewPhoneInput(
-                                    e.target.value
-                                      .replace(/\D/g, '')
-                                      .slice(0, 10),
-                                  )
-                                }
-                                autoFocus
-                                fullWidth
-                              />
-                              <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  onClick={handleSavePhone}
-                                  disabled={processing}
-                                >
-                                  Save & Participate
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  onClick={() => setIsAddingPhone(false)}
-                                >
-                                  Cancel
-                                </Button>
-                              </Box>
-                            </Box>
-                          ) : (
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => setIsAddingPhone(true)}
-                              >
-                                Add Phone Number
-                              </Button>
-                              <Button
-                                size="small"
-                                variant="text"
-                                color="inherit"
-                                onClick={() => setSkipLuckyDraw(true)}
-                              >
-                                Skip Lucky Draw
-                              </Button>
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      Eligible ₹{eligibleAmount.toFixed(2)} →{' '}
-                      {Math.floor(
-                        eligibleAmount /
-                          parseFloat(activeCampaign.min_bill_amount),
-                      )}{' '}
-                      entries · Select a customer above to participate
-                    </Typography>
-                  )}
-                </Box>
-              )}
-
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Autocomplete
-                fullWidth
-                options={customerOptions}
-                getOptionLabel={(option) =>
-                  `${option.name} (${option.phone || 'N/A'})`
-                }
-                value={selectedCustomer}
-                onChange={(_, newValue) => setSelectedCustomer(newValue)}
                 onInputChange={(_, newInputValue) =>
                   setCustomerSearchTerm(newInputValue)
                 }
@@ -1277,349 +1116,26 @@ Best of luck!`;
               >
                 <PersonAddIcon />
               </IconButton>
-            </Box>
+            </>
+          }
 
-            {/* {selectedCustomer && (
-              <Box
-                sx={{
-                  mb: 2,
-                  p: 1.5,
-                  bgcolor: 'primary.action.hover',
-                  borderRadius: 2,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  border: '1px solid',
-                  borderColor: 'primary.light',
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="body2"
-                    fontWeight={700}
-                    color="primary.dark"
-                  >
-                    {selectedCustomer.name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {selectedCustomer.phone || 'No Phone'}
-                  </Typography>
-                </Box>
-                <IconButton
-                  size="small"
-                  onClick={() => setSelectedCustomer(null)}
-                  sx={{ color: 'text.secondary' }}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            )} */}
-
-            <Box
-              sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}
-            >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography color="text.secondary">Total Items</Typography>
-                <Typography fontWeight={600}>{cart.length}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography color="text.secondary">Total Quantity</Typography>
-                <Typography fontWeight={600}>{totalItems}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography color="text.secondary">Subtotal</Typography>
-                <Typography fontWeight={600}>₹{subTotal.toFixed(2)}</Typography>
-              </Box>
-
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Typography color="text.secondary">Round Adjust</Typography>
-                <TextField
-                  size="small"
-                  type="number"
-                  value={roundAdjust}
-                  onChange={(e) => setRoundAdjust(e.target.value)}
-                  onFocus={(e) => {
-                    e.target.select();
-                    setActiveSection('BILL_SUMMARY');
-                  }}
-                  onBlur={() => {
-                    if (roundAdjust === '' || isNaN(parseFloat(roundAdjust))) {
-                      setRoundAdjust(0);
-                    }
-                  }}
-                  inputProps={{
-                    style: {
-                      textAlign: 'right',
-                      padding: '4px 8px',
-                      width: '80px',
-                      fontWeight: 600,
-                    },
-                  }}
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 1.5,
-                      backgroundColor: 'rgba(0,0,0,0.02)',
-                    },
-                  }}
-                />
-              </Box>
-
-              <Divider sx={{ my: 1 }} />
-
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  mb: 1,
-                }}
-              >
-                <Typography variant="h6" fontWeight={800}>
-                  Total Payable
-                </Typography>
-                <Typography variant="h4" fontWeight={900} color="primary.main">
-                  ₹{total.toFixed(2)}
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box sx={{ mt: 0 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={isCredit}
-                    onChange={(e) => setIsCredit(e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label={<Typography fontWeight={700}>Credit Bill</Typography>}
-              />
-
-              {isCredit && (
-                <Box
-                  sx={{
-                    mt: 2,
-                    mb: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 2,
-                    p: 2,
-                    bgcolor: 'rgba(0,0,0,0.02)',
-                    borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  {!selectedCustomer && (
-                    <Typography
-                      variant="body2"
-                      color="error"
-                      sx={{ textAlign: 'center', mb: 1 }}
-                    >
-                      Please select a customer at the top
-                    </Typography>
-                  )}
-                  {selectedCustomer && (
-                    <>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary">
-                          Current Due:
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                          color="error.main"
-                        >
-                          ₹{parseFloat(selectedCustomer.total_due).toFixed(2)}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary">
-                          Credit Limit:
-                        </Typography>
-                        <Typography variant="body2" fontWeight={700}>
-                          {parseFloat(selectedCustomer.credit_limit) === 0
-                            ? 'No Limit'
-                            : `₹${parseFloat(selectedCustomer.credit_limit).toFixed(2)}`}
-                        </Typography>
-                      </Box>
-                    </>
-                  )}
-                  <TextField
-                    label="Paid at Counter"
-                    type="number"
-                    size="small"
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">₹</InputAdornment>
-                      ),
-                    }}
-                  />
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      mt: 1,
-                    }}
-                  >
-                    <Typography fontWeight={700} color="primary.main">
-                      Credit Amount:
-                    </Typography>
-                    <Typography fontWeight={800} color="primary.main">
-                      ₹{Math.max(0, total - Number(paidAmount || 0)).toFixed(2)}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-
-              <Typography
-                variant="subtitle2"
-                fontWeight={700}
-                sx={{ mt: 1, mb: 1.5 }}
-              >
-                Payment Method
-              </Typography>
-              <ToggleButtonGroup
-                value={paymentMethod}
-                exclusive
-                onChange={(e, newMethod) => {
-                  if (newMethod !== null) setPaymentMethod(newMethod);
-                }}
-                fullWidth
-                color="primary"
-                size="small"
-              >
-                <ToggleButton
-                  value="CASH"
-                  sx={{
-                    py: 1,
-                    borderRadius: 2,
-                    border: '1px solid !important',
-                    borderColor: 'divider',
-                    '&.Mui-selected': {
-                      borderColor: 'primary.main !important',
-                      bgcolor: 'primary.action.selected',
-                    },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CashIcon sx={{ fontSize: 18 }} />
-                    <Typography
-                      variant="button"
-                      fontWeight={700}
-                      sx={{ fontSize: '0.75rem' }}
-                    >
-                      CASH
-                    </Typography>
-                  </Box>
-                </ToggleButton>
-                <ToggleButton
-                  value="UPI"
-                  sx={{
-                    py: 1,
-                    borderRadius: 2,
-                    border: '1px solid !important',
-                    borderColor: 'divider',
-                    '&.Mui-selected': {
-                      borderColor: 'primary.main !important',
-                      bgcolor: 'primary.action.selected',
-                    },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <UpiIcon sx={{ fontSize: 18 }} />
-                    <Typography
-                      variant="button"
-                      fontWeight={700}
-                      sx={{ fontSize: '0.75rem' }}
-                    >
-                      UPI
-                    </Typography>
-                  </Box>
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-
-            <Box
-              sx={{
-                mt: 'auto',
-                pt: 3,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2,
-              }}
-            >
-              <TextField
-                fullWidth
-                required
-                size="small"
-                label="Customer Phone"
-                placeholder="Phone number"
-                value={customerPhoneInput}
-                onChange={(e) =>
-                  setCustomerPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 15))
-                }
-                FormHelperTextProps={{ sx: { m: 0, mt: 0.5, fontSize: '0.7rem' } }}
-              />
-
-              <Button
-                fullWidth
-                variant="outlined"
-                size="large"
-                disabled={processing || cart.length === 0}
-                onClick={() => handleCheckout(false)}
-                sx={{
-                  py: 1,
-                  borderRadius: 2,
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  textTransform: 'none',
-                }}
-              >
-                Checkout
-              </Button>
-
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                disabled={processing || cart.length === 0}
-                onClick={() => handleCheckout(true)}
-                sx={{
-                  py: 1.5,
-                  borderRadius: 2,
-                  fontSize: '1.1rem',
-                  fontWeight: 800,
-                  textTransform: 'none',
-                }}
-              >
-                {processing ? (
-                  <CircularProgress size={28} color="inherit" />
-                ) : (
-                  `Checkout & Print ₹${total.toFixed(2)}`
-                )}
-              </Button>
-            </Box>
-          </Paper>
+            selectedCustomer={selectedCustomer}
+            totalItems={cart.length}
+            subtotal={subTotal}
+            roundAdjust={roundAdjust}
+            onRoundAdjustChange={setRoundAdjust}
+            total={total}
+            isCredit={isCredit}
+            onCreditChange={setIsCredit}
+            paidAmount={paidAmount}
+            onPaidAmountChange={setPaidAmount}
+            method={paymentMethod}
+            onMethodChange={setPaymentMethod}
+            phone={customerPhoneInput}
+            onPhoneChange={setCustomerPhoneInput}
+            hasCart={cart.length > 0}
+            onCheckout={handleCheckout}
+          />
         </Box>
       </Box>
 
