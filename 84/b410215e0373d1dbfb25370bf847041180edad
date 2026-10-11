@@ -1,0 +1,17 @@
+client/src/components/BillSummary.jsx
+  h_67e264807cd63e 1-308
+client/src/pages/CashierDashboard.jsx
+  h_67e264807cd63e 34,503-504,656-658,671-672,684,1054,1057-1060,1066,1068,1071-1082,1122-1138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "2.0.2",
+  "base_commit_sha": "84b410215e0373d1dbfb25370bf847041180edad",
+  "branch": "dev",
+  "prompts": {},
+  "humans": {
+    "h_67e264807cd63e": {
+      "author": "SamiMansuri <samimansuri303@gmail.com>"
+    }
+  }
+}
