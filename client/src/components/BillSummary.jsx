@@ -109,12 +109,20 @@ export default function BillSummary({
 
         {/* 3. Payment */}
         <section className="bs-pay" aria-label="Payment">
-          <label className="bs-credit">
-            <input type="checkbox" role="switch" checked={isCredit} onChange={(e) => onCreditChange?.(e.target.checked)} />
-            <span className="bs-switch" aria-hidden="true" />
+          <div className="bs-credit">
+            <label className="bs-switch-wrap" htmlFor="bs-credit-toggle">
+              <input
+                id="bs-credit-toggle"
+                type="checkbox"
+                role="switch"
+                checked={isCredit}
+                onChange={(e) => onCreditChange?.(e.target.checked)}
+              />
+              <span className="bs-switch" aria-hidden="true" />
+            </label>
             <span>Credit bill</span>
             {isCredit && <em className="bs-note">Pay later, customer needed</em>}
-          </label>
+          </div>
 
           {isCredit && (
             <div className="bs-credit-box">
@@ -346,9 +354,15 @@ const css = `
   gap: 8px;
   font-size: 13.5px;
   font-weight: 600;
-  cursor: pointer;
   min-height: 28px;
   user-select: none;
+}
+.bs-switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  line-height: 0;
 }
 .bs-credit input {
   position: absolute;
@@ -362,6 +376,7 @@ const css = `
   background: #cbd5e1;
   position: relative;
   flex: none;
+  cursor: pointer;
   transition: background 0.15s ease;
 }
 .bs-switch::after {
