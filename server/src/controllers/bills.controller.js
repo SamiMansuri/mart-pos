@@ -52,8 +52,6 @@ export const createBill = asyncHandler(async (req, res) => {
   if (!idempotency_key)
     throw createHttpError(400, "Idempotency key is required");
   if (!items?.length) throw createHttpError(400, "Cart is empty");
-  if (!normalizedPhone)
-    throw createHttpError(400, "Customer phone number is required");
 
   if (is_credit) {
     if (!customer_id)
