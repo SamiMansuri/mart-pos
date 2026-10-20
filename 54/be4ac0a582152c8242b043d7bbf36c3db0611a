@@ -1,0 +1,19 @@
+client/src/pages/CashierDashboard.jsx
+  h_67e264807cd63e 32,36,171-175,179-187,191-195,726-727,731-732,840-860,1216-1222
+client/src/components/BarcodeScanner.jsx
+  h_67e264807cd63e 1-754
+client/vite.config.js
+  h_67e264807cd63e 8-9,11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "2.0.2",
+  "base_commit_sha": "54be4ac0a582152c8242b043d7bbf36c3db0611a",
+  "branch": "dev",
+  "prompts": {},
+  "humans": {
+    "h_67e264807cd63e": {
+      "author": "SamiMansuri <samimansuri303@gmail.com>"
+    }
+  }
+}
