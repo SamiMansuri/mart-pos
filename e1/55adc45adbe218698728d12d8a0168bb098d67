@@ -1,0 +1,13 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "2.0.2",
+  "base_commit_sha": "e155adc45adbe218698728d12d8a0168bb098d67",
+  "branch": "dev",
+  "prompts": {},
+  "humans": {
+    "h_67e264807cd63e": {
+      "author": "SamiMansuri <samimansuri303@gmail.com>"
+    }
+  }
+}
