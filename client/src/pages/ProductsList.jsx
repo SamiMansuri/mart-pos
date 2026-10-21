@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import {
   Box,
@@ -18,6 +18,7 @@ import {
   IconButton,
   InputAdornment,
   TextField,
+  Snackbar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -25,12 +26,14 @@ import {
   Search as SearchIcon,
   Print as PrintIcon,
   Block as BlockIcon,
+  Clear as ClearIcon,
+  QrCodeScanner as QrCodeScannerIcon,
 } from '@mui/icons-material';
-import { Snackbar } from '@mui/material';
 import { productsApi } from '../api/api';
 import { isAdmin as checkAdmin } from '../utils/auth.utils';
 import PrintBarcodeModal from '../components/PrintBarcodeModal';
 import UpdateProductModal from '../components/UpdateProductModal';
+import BarcodeScanner from '../components/BarcodeScanner';
 import { printBarcodeLabel } from '../services/print.service';
 
 const ProductsList = () => {
@@ -57,6 +60,119 @@ const ProductsList = () => {
   const [selectedProductIdToUpdate, setSelectedProductIdToUpdate] = useState(null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  // Barcode Scanner State & Refs
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const searchInputRef = useRef(null);
+  const barcodeBufferRef = useRef('');
+  const lastKeyTimeRef = useRef(0);
+  const scanTimeoutRef = useRef(null);
+
+  const applyScannedBarcode = useCallback((code) => {
+    const cleanCode = (code || '').trim();
+    if (!cleanCode) return;
+
+    // Immediately replace search term with the newly scanned barcode (clearing old barcode)
+    setSearchTerm(cleanCode);
+    setDebouncedSearch(cleanCode);
+    setPage(1);
+
+    if (searchInputRef.current) {
+      searchInputRef.current.value = cleanCode;
+      searchInputRef.current.focus();
+      searchInputRef.current.select();
+    }
+  }, []);
+
+  // Global barcode listener for hardware scanners
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Do nothing if dialog modals or camera scanner are open
+      if (printModalOpen || updateModalOpen || scannerOpen) return;
+
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTimeRef.current;
+      lastKeyTimeRef.current = currentTime;
+
+      const isSearchInput =
+        document.activeElement &&
+        document.activeElement === searchInputRef.current;
+
+      const isOtherInput =
+        document.activeElement &&
+        !isSearchInput &&
+        (document.activeElement.tagName === 'INPUT' ||
+          document.activeElement.tagName === 'TEXTAREA');
+
+      if (isOtherInput) return;
+
+      // Handle Enter (which concludes most barcode scans)
+      if (e.key === 'Enter') {
+        if (scanTimeoutRef.current) {
+          clearTimeout(scanTimeoutRef.current);
+          scanTimeoutRef.current = null;
+        }
+
+        // Hardware barcode scanners send keystrokes with timeDiff <= 100ms
+        if (barcodeBufferRef.current.length >= 3 && timeDiff <= 100) {
+          e.preventDefault();
+          e.stopPropagation();
+          const scannedCode = barcodeBufferRef.current;
+          barcodeBufferRef.current = '';
+          applyScannedBarcode(scannedCode);
+          return;
+        }
+
+        // Manual Enter in search input
+        if (isSearchInput && searchTerm.trim()) {
+          setDebouncedSearch(searchTerm.trim());
+          setPage(1);
+        }
+
+        barcodeBufferRef.current = '';
+        return;
+      }
+
+      // Reset buffer if delay indicates manual typing
+      if (timeDiff > 100) {
+        barcodeBufferRef.current = '';
+      }
+
+      // Only buffer single printable characters
+      if (e.key.length === 1) {
+        // If rapid typing (< 60ms) detected while focused in search bar,
+        // prevent appending to avoid messy concatenation while streaming
+        if (isSearchInput && timeDiff <= 60 && barcodeBufferRef.current.length > 0) {
+          e.preventDefault();
+        }
+
+        barcodeBufferRef.current += e.key;
+
+        // Fallback timeout in case the scanner does not send an Enter key
+        if (scanTimeoutRef.current) {
+          clearTimeout(scanTimeoutRef.current);
+        }
+
+        if (barcodeBufferRef.current.length >= 3) {
+          scanTimeoutRef.current = setTimeout(() => {
+            if (barcodeBufferRef.current.length >= 3) {
+              const scannedCode = barcodeBufferRef.current;
+              barcodeBufferRef.current = '';
+              applyScannedBarcode(scannedCode);
+            }
+          }, 80);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown, true);
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+    };
+  }, [printModalOpen, updateModalOpen, scannerOpen, searchTerm, applyScannedBarcode]);
 
   // Handle search debouncing
   useEffect(() => {
@@ -178,19 +294,50 @@ const ProductsList = () => {
           }}
         >
           <TextField
+            inputRef={searchInputRef}
             size="small"
-            placeholder="Search products..."
+            placeholder="Search products or scan barcode..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={(e) => e.target.select()}
             sx={{
               flexGrow: { xs: 1, md: 0 },
-              maxWidth: { xs: '100%', md: 350 },
+              maxWidth: { xs: '100%', md: 380 },
               bgcolor: 'background.paper',
             }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
                   <SearchIcon fontSize="small" color="action" />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  {searchTerm && (
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setDebouncedSearch('');
+                        setPage(1);
+                        searchInputRef.current?.focus();
+                      }}
+                      title="Clear search"
+                      edge="end"
+                      sx={{ mr: 0.5 }}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={() => setScannerOpen(true)}
+                    title="Scan Barcode (Camera)"
+                    edge="end"
+                  >
+                    <QrCodeScannerIcon fontSize="small" />
+                  </IconButton>
                 </InputAdornment>
               ),
             }}
@@ -400,6 +547,17 @@ const ProductsList = () => {
             </Box>
           )}
         </>
+      )}
+
+      {/* Mobile Barcode Scanner Modal */}
+      {scannerOpen && (
+        <BarcodeScanner
+          onScan={(scannedCode) => {
+            applyScannedBarcode(scannedCode);
+            setScannerOpen(false);
+          }}
+          onClose={() => setScannerOpen(false)}
+        />
       )}
 
       {/* Print Barcode Modal */}
