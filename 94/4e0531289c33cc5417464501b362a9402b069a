@@ -1,0 +1,21 @@
+server/src/routes/index.routes.js
+  h_67e264807cd63e 12,21
+client/src/App.jsx
+  h_67e264807cd63e 21,282-286,290
+server/src/controllers/gstReports.controller.js
+  h_67e264807cd63e 1-257
+client/src/api/api.js
+  h_67e264807cd63e 41,48-95,263-272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "2.0.2",
+  "base_commit_sha": "944e0531289c33cc5417464501b362a9402b069a",
+  "branch": "dev",
+  "prompts": {},
+  "humans": {
+    "h_67e264807cd63e": {
+      "author": "SamiMansuri <samimansuri303@gmail.com>"
+    }
+  }
+}
