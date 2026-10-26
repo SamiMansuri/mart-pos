@@ -246,7 +246,7 @@ const PurchaseDetails = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    {["#", "Product", "Batch", "Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "GST Amt", "Total"].map((h) => (
+                    {["#", "Product", "HSN", "Batch", "Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "GST Amt", "Total"].map((h) => (
                       <TableCell key={h} sx={headCellStyle} align={["Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "GST Amt", "Total"].includes(h) ? "right" : "left"}>
                         {h}
                       </TableCell>
@@ -258,6 +258,7 @@ const PurchaseDetails = () => {
                     <TableRow key={idx} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
                       <TableCell sx={cellStyle}>{idx + 1}</TableCell>
                       <TableCell sx={{ ...cellStyle, fontWeight: 500 }}>{item.product_name}</TableCell>
+                      <TableCell sx={cellStyle}>{item.hsn_code || "—"}</TableCell>
                       <TableCell sx={{ ...cellStyle, color: "text.secondary" }}>{item.batch_no}</TableCell>
                       <TableCell sx={cellStyle} align="right">{item.qty}</TableCell>
                       <TableCell sx={cellStyle} align="right">{fmt(item.cost_price)}</TableCell>
@@ -270,7 +271,7 @@ const PurchaseDetails = () => {
                   ))}
                   {(!purchase.items || purchase.items.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={10} align="center" sx={{ py: 3, color: 'text.secondary' }}>No items found.</TableCell>
+                      <TableCell colSpan={11} align="center" sx={{ py: 3, color: 'text.secondary' }}>No items found.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>

@@ -1,13 +1,13 @@
 export const PRODUCT_QUERIES = {
   GET_ALL: (isAdmin, search, limit, offset) => {
     const isAdminField = isAdmin
-      ? ", s.cost_price, p.updated_at, p.updated_by, p.created_by"
+      ? ", p.updated_at, p.updated_by, p.created_by"
       : "";
     return {
       text: `
         SELECT 
           p.id, p.name, p.barcode, p.selling_price, p.sale_type, p.is_active, p.created_at, p.gst_rate, p.hsn_code,
-          s.stock_qty, lb.batch_no as latest_batch, lb.mrp ${isAdminField}
+          s.stock_qty, lb.batch_no as latest_batch, lb.mrp, COALESCE(lb.cost_price, s.cost_price, 0) as cost_price ${isAdminField}
         FROM products p
         LEFT JOIN (
           SELECT product_id, SUM(quantity) as stock_qty, MAX(cost_price) as cost_price
@@ -15,7 +15,7 @@ export const PRODUCT_QUERIES = {
           GROUP BY product_id
         ) s ON p.id = s.product_id
         LEFT JOIN LATERAL (
-          SELECT batch_no, mrp
+          SELECT batch_no, mrp, cost_price
           FROM product_batches pb
           WHERE pb.product_id = p.id
           ORDER BY pb.created_at DESC
@@ -43,7 +43,7 @@ export const PRODUCT_QUERIES = {
   GET_BY_BARCODE: (isAdmin) => {
     const fields = isAdmin
       ? "p.*, s.stock_qty, s.cost_price, s.mrp, b.batch_no, b.expiry_date"
-      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.mrp, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
+      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, p.gst_rate, p.hsn_code, s.cost_price, s.mrp, s.stock_qty, p.created_at, b.batch_no, b.expiry_date";
     return `
       SELECT ${fields} 
       FROM products p 
@@ -59,7 +59,7 @@ export const PRODUCT_QUERIES = {
   GET_BY_ID: (isAdmin) => {
     const fields = isAdmin
       ? "p.*, s.stock_qty, s.cost_price, b.batch_no, b.expiry_date, lb.mrp, p.gst_rate, p.hsn_code, p.sale_type"
-      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, p.created_at, b.batch_no, b.expiry_date, lb.mrp, p.gst_rate, p.hsn_code, p.sale_type";
+      : "p.id, p.name, p.barcode, p.selling_price, p.sale_type, s.stock_qty, s.cost_price, p.created_at, b.batch_no, b.expiry_date, lb.mrp, p.gst_rate, p.hsn_code, p.sale_type";
     return `
       SELECT ${fields} 
       FROM products p 
@@ -70,7 +70,7 @@ export const PRODUCT_QUERIES = {
         GROUP BY product_id
       ) s ON p.id = s.product_id
       LEFT JOIN LATERAL (
-       SELECT batch_no, mrp
+       SELECT batch_no, mrp, cost_price
        FROM product_batches pb
        WHERE pb.product_id = p.id
        ORDER BY pb.created_at DESC
@@ -413,7 +413,8 @@ export const PURCHASE_QUERIES = {
   GET_ITEMS: `
     SELECT 
       pi.*,
-      pr.name AS product_name
+      pr.name AS product_name,
+      pr.hsn_code
     FROM purchase_items pi
     JOIN products pr ON pr.id = pi.product_id
     WHERE pi.purchase_id = $1

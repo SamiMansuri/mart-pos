@@ -265,11 +265,20 @@ const ProductSearch = ({ onSelect, onAddNew }) => {
                     <Typography sx={{ fontSize: "13px", fontWeight: 500 }}>{p.name}</Typography>
                     <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                       <Chip label={`GST ${p.gst_rate ?? 0}%`} size="small" sx={{ fontSize: "10px", height: 18 }} />
+                      {p.cost_price !== undefined && p.cost_price !== null && parseFloat(p.cost_price) > 0 && (
+                        <Chip
+                          label={`Cost: ${fmt(p.cost_price)}`}
+                          size="small"
+                          variant="outlined"
+                          color="info"
+                          sx={{ fontSize: "10px", height: 18, fontWeight: 600 }}
+                        />
+                      )}
                       <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "primary.main" }}>{fmt(p.selling_price)}</Typography>
                     </Box>
                   </Box>
                   <Typography sx={{ fontSize: "11px", color: "text.secondary", mt: 0.2 }}>
-                    {p.barcode ? `Barcode: ${p.barcode} · ` : ""}Stock: {p.stock_qty ?? 0}
+                    {p.barcode ? `Barcode: ${p.barcode} · ` : ""}{p.hsn_code ? `HSN: ${p.hsn_code} · ` : ""}{p.cost_price && parseFloat(p.cost_price) > 0 ? `Cost: ${fmt(p.cost_price)} · ` : ""}Stock: {p.stock_qty ?? 0}
                   </Typography>
                 </Box>
               ))}
@@ -306,7 +315,7 @@ const PurchaseEntry = () => {
   // Item form state (always visible, reset after add)
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [itemForm, setItemForm] = useState({
-    qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0",
+    qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0", hsn_code: "",
   });
 
   // Modals
@@ -322,12 +331,15 @@ const PurchaseEntry = () => {
 
   const handleProductSelect = (product) => {
     setSelectedProduct(product);
+    const parsedCost = parseFloat(product.cost_price);
+    const parsedMrp = parseFloat(product.mrp);
     setItemForm({
       qty: "1",
-      cost_price: "",
-      mrp: "",
+      cost_price: !isNaN(parsedCost) && parsedCost > 0 ? String(parsedCost) : "",
+      mrp: !isNaN(parsedMrp) && parsedMrp > 0 ? String(parsedMrp) : "",
       expiry_date: "",
       gst_rate: String(parseFloat(product.gst_rate) || 0),
+      hsn_code: product.hsn_code || "",
     });
   };
 
@@ -353,12 +365,13 @@ const PurchaseEntry = () => {
       cost_price: parseFloat(itemForm.cost_price),
       mrp: parseFloat(itemForm.mrp) || 0,
       gst_rate: parseFloat(itemForm.gst_rate),
+      hsn_code: itemForm.hsn_code ? itemForm.hsn_code.trim() : "",
       ...gst,
     }]);
 
     // Reset item form but keep product selected for fast entry of same product
     setSelectedProduct(null);
-    setItemForm({ qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0" });
+    setItemForm({ qty: "1", cost_price: "", mrp: "", expiry_date: "", gst_rate: "0", hsn_code: "" });
     setStatus({ type: "", message: "" });
   };
 
@@ -399,6 +412,7 @@ const PurchaseEntry = () => {
           cost_price: i.cost_price,
           mrp: i.mrp,
           gst_rate: i.gst_rate,
+          hsn_code: i.hsn_code || null,
         })),
       });
       setStatus({ type: "success", message: "Purchase saved successfully!" });
@@ -507,7 +521,7 @@ const PurchaseEntry = () => {
             />
             {selectedProduct && (
               <Chip
-                label={selectedProduct.name}
+                label={`${selectedProduct.name}${selectedProduct.cost_price && parseFloat(selectedProduct.cost_price) > 0 ? ` (Cost: ${fmt(selectedProduct.cost_price)})` : ""}`}
                 onDelete={() => setSelectedProduct(null)}
                 color="primary"
                 size="small"
@@ -520,23 +534,23 @@ const PurchaseEntry = () => {
             {selectedProduct && (
               <Box sx={{ bgcolor: "#fafafa", border: "1px solid #e8e8e8", borderRadius: 1, p: 1.5 }}>
                 <Grid container spacing={1.5} alignItems="flex-end">
-                  <Grid item xs={4} sm={3} md={2}>
-                    <TextField sx={{ width: '80px' }} size="small" label="Qty *" type="number" value={itemForm.qty}
+                  <Grid item xs={4} sm={2} md={1.5}>
+                    <TextField fullWidth size="small" label="Qty *" type="number" value={itemForm.qty}
                       onChange={handleFormChange("qty")} inputProps={{ min: "0.01", step: "0.01" }} />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
-                    <TextField sx={{ width: '120px' }} size="small" label="Cost Price *" type="number" value={itemForm.cost_price}
+                  <Grid item xs={6} sm={3} md={2}>
+                    <TextField fullWidth size="small" label="Cost Price *" type="number" value={itemForm.cost_price}
                       onChange={handleFormChange("cost_price")}
                       InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
                       inputProps={{ min: "0", step: "0.01" }} />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
-                    <TextField sx={{ width: '120px' }} size="small" label="MRP" type="number" value={itemForm.mrp}
+                  <Grid item xs={6} sm={3} md={1.8}>
+                    <TextField fullWidth size="small" label="MRP" type="number" value={itemForm.mrp}
                       onChange={handleFormChange("mrp")}
                       InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
                       inputProps={{ min: "0", step: "0.01" }} />
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={2} md={1.8}>
                     <FormControl fullWidth size="small">
                       <InputLabel>GST Rate</InputLabel>
                       <Select value={itemForm.gst_rate} sx={{ minWidth: '100px' }} label="GST Rate" onChange={handleFormChange("gst_rate")}>
@@ -548,13 +562,17 @@ const PurchaseEntry = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={6} sm={4} md={2}>
+                  <Grid item xs={6} sm={2} md={1.8}>
+                    <TextField fullWidth size="small" label="HSN Code" placeholder="HSN" value={itemForm.hsn_code}
+                      onChange={handleFormChange("hsn_code")} inputProps={{ maxLength: 8 }} />
+                  </Grid>
+                  <Grid item xs={6} sm={3} md={2}>
                     <TextField fullWidth size="small" label="Expiry Date" type="date" value={itemForm.expiry_date}
                       onChange={handleFormChange("expiry_date")} InputLabelProps={{ shrink: true }} />
                   </Grid>
-                  <Grid item xs={12} md={1}>
+                  <Grid item xs={6} sm={2} md={1.1}>
                     <Button fullWidth variant="contained" size="small" onClick={handleAddItem}
-                      startIcon={<AddIcon />} sx={{ whiteSpace: "nowrap" }}>
+                      startIcon={<AddIcon />} sx={{ whiteSpace: "nowrap", height: "40px" }}>
                       Add
                     </Button>
                   </Grid>
@@ -599,7 +617,7 @@ const PurchaseEntry = () => {
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["#", "Product", "Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "CGST", "SGST", "Total", ""].map((h) => (
+                {["#", "Product", "HSN", "Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "CGST", "SGST", "Total", ""].map((h) => (
                   <TableCell key={h} sx={headCellStyle}
                     align={["Qty", "Cost/Unit", "MRP", "GST%", "Taxable", "CGST", "SGST", "Total"].includes(h) ? "right" : "left"}>
                     {h}
@@ -619,6 +637,7 @@ const PurchaseEntry = () => {
                   <TableRow key={item.id} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
                     <TableCell sx={cellStyle}>{idx + 1}</TableCell>
                     <TableCell sx={{ ...cellStyle, fontWeight: 500 }}>{item.product_name}</TableCell>
+                    <TableCell sx={cellStyle}>{item.hsn_code || "—"}</TableCell>
                     <TableCell sx={cellStyle} align="right">{item.qty}</TableCell>
                     <TableCell sx={cellStyle} align="right">{fmt(item.cost_price)}</TableCell>
                     <TableCell sx={cellStyle} align="right">{item.mrp ? fmt(item.mrp) : "—"}</TableCell>
