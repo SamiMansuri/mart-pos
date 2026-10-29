@@ -907,6 +907,12 @@ Best of luck!`;
                     align="right"
                     sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
                   >
+                    MRP
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
+                  >
                     Price
                   </TableCell>
                   <TableCell
@@ -925,7 +931,7 @@ Best of luck!`;
                 {cart.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       align="center"
                       sx={{ py: 10, borderBottom: 'none' }}
                     >
@@ -936,11 +942,19 @@ Best of luck!`;
                     </TableCell>
                   </TableRow>
                 ) : (
-                  cart.map((item, index) => (
-                    <TableRow
-                      key={item.id}
-                      hover
-                      selected={index === selectedCartIndex}
+                  cart.map((item, index) => {
+                    const mrp =
+                      item.mrp !== null &&
+                      item.mrp !== undefined &&
+                      item.mrp !== ''
+                        ? item.mrp
+                        : item.selling_price;
+
+                    return (
+                      <TableRow
+                        key={item.id}
+                        hover
+                        selected={index === selectedCartIndex}
                       sx={{
                         '&.Mui-selected': {
                           bgcolor: 'primary.action.selected',
@@ -1080,6 +1094,9 @@ Best of luck!`;
                         </Box>
                       </TableCell>
                       <TableCell align="right">
+                        ₹{parseFloat(mrp || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell align="right">
                         ₹{parseFloat(item.selling_price).toFixed(2)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>
@@ -1095,8 +1112,9 @@ Best of luck!`;
                         </IconButton>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
+                  );
+                })
+              )}
               </TableBody>
             </Table>
           </TableContainer>
