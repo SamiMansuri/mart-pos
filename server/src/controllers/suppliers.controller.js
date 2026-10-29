@@ -4,8 +4,12 @@ import { asyncHandler } from "../utils/asynHandler.util.js";
 import { getSuccessResponse } from "../utils/response.util.js";
 import { withTransaction } from "../utils/transaction.util.js";
 
-export const getAllSuppliers = asyncHandler(async (_req, res) => {
+export const getAllSuppliers = asyncHandler(async (req, res) => {
+  const { q } = req.query;
   const { rows } = await withTransaction(async (client) => {
+    if (q && q.trim()) {
+      return client.query(SUPPLIER_QUERIES.SEARCH, [`%${q.trim()}%`]);
+    }
     return client.query(SUPPLIER_QUERIES.GET_ALL);
   });
 

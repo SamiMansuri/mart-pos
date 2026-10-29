@@ -8,9 +8,10 @@ const API_URL = import.meta.env.VITE_API_URL;
  */
 export const apiFetch = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   };
@@ -69,7 +70,9 @@ export const downloadReportBlob = async (endpoint, defaultFilename = 'report.xls
     try {
       const err = await response.json();
       errorMsg = err.error || err.message || errorMsg;
-    } catch (_) {}
+    } catch {
+      // ignore json parse error on non-json error responses
+    }
     throw new Error(errorMsg);
   }
 
@@ -273,7 +276,11 @@ export const reportsApi = {
 };
 
 export const suppliersApi = {
-  getAll: () => apiFetch('/suppliers'),
+  getAll: (search = '') => {
+    let url = '/suppliers';
+    if (search) url += `?q=${encodeURIComponent(search)}`;
+    return apiFetch(url);
+  },
   create: (data) => apiFetch('/suppliers', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -292,4 +299,17 @@ export const purchasesApi = {
       method: 'POST',
       body: JSON.stringify(paymentData),
     }),
+};
+
+export const invoiceExtractorApi = {
+  extract: (file, method = 'auto') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    let url = '/invoice-extractor/extract';
+    if (method) url += `?method=${encodeURIComponent(method)}`;
+    return apiFetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+  },
 };
