@@ -14,6 +14,7 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 import { productsApi, purchasesApi, suppliersApi, invoiceExtractorApi } from "../api/api";
+import InvoiceReconciliationModal from "../components/InvoiceReconciliationModal.jsx";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const calcGST = (costPrice, qty, gstRate) => {
@@ -115,14 +116,27 @@ const AddSupplierModal = ({ open, onClose, onAdded, initialName = "" }) => {
 };
 
 // ─── Add Product Modal ────────────────────────────────────────────────────────
-const AddProductModal = ({ open, onClose, onAdded, initialName }) => {
+const AddProductModal = ({ open, onClose, onAdded, initialName, initialData }) => {
   const [form, setForm] = useState({ product_name: "", selling_price: "", gst_rate: "", hsn_code: "", sale_type: "UNIT" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (open) setForm((f) => ({ ...f, product_name: initialName || "" }));
-  }, [open, initialName]);
+    if (open) {
+      if (initialData) {
+        setForm({
+          product_name: initialData.product_name || "",
+          selling_price: initialData.selling_price || "",
+          gst_rate: initialData.gst_rate !== undefined ? String(initialData.gst_rate) : "",
+          hsn_code: initialData.hsn_code || "",
+          sale_type: initialData.sale_type || "UNIT",
+        });
+      } else {
+        setForm({ product_name: initialName || "", selling_price: "", gst_rate: "", hsn_code: "", sale_type: "UNIT" });
+      }
+      setError("");
+    }
+  }, [open, initialName, initialData]);
 
   const handleSave = async () => {
     if (!form.product_name.trim() || !form.selling_price || form.gst_rate === "") {
@@ -328,6 +342,10 @@ const PurchaseEntry = () => {
   const [notes, setNotes] = useState("");
   const [invoicePdf, setInvoicePdf] = useState(null);
   const [extractingPdf, setExtractingPdf] = useState(false);
+  const [extractedInvoiceData, setExtractedInvoiceData] = useState(null);
+  const [openReconciliationModal, setOpenReconciliationModal] = useState(false);
+  const [quickCreateCallback, setQuickCreateCallback] = useState(null);
+  const [productModalInitialData, setProductModalInitialData] = useState(null);
   const [isPdfDragOver, setIsPdfDragOver] = useState(false);
   const pdfInputRef = useRef(null);
 
@@ -367,12 +385,25 @@ const PurchaseEntry = () => {
 
     // Send to backend invoice extractor endpoint
     setExtractingPdf(true);
-    invoiceExtractorApi.extract(file)
+    invoiceExtractorApi.extract(file, supplier?.id)
       .then((extractedData) => {
         console.log("Extracted invoice JSON from backend:", extractedData);
+        if (extractedData?.success && extractedData?.data?.items?.length > 0) {
+          setExtractedInvoiceData(extractedData);
+          setOpenReconciliationModal(true);
+        } else {
+          setStatus({
+            type: "warning",
+            message: "No line items could be parsed from this PDF invoice.",
+          });
+        }
       })
       .catch((err) => {
         console.error("Invoice extraction error:", err);
+        setStatus({
+          type: "error",
+          message: err.message || "Failed to extract invoice from PDF",
+        });
       })
       .finally(() => {
         setExtractingPdf(false);
@@ -390,6 +421,8 @@ const PurchaseEntry = () => {
       URL.revokeObjectURL(invoicePdf.url);
     }
     setInvoicePdf(null);
+    setExtractedInvoiceData(null);
+    setOpenReconciliationModal(false);
     if (pdfInputRef.current) {
       pdfInputRef.current.value = "";
     }
@@ -400,6 +433,37 @@ const PurchaseEntry = () => {
     if (invoicePdf?.url) {
       window.open(invoicePdf.url, "_blank", "noopener,noreferrer");
     }
+  };
+
+  const handleReconciliationConfirm = async ({ items: newItems, invoiceNo: newInvNo, invoiceDate: newInvDate, mappingsToSave }) => {
+    if (newItems?.length > 0) {
+      setItems((prev) => [...prev, ...newItems]);
+    }
+    if (newInvNo && !invoiceNo) {
+      setInvoiceNo(newInvNo);
+    }
+    if (newInvDate) {
+      setInvoiceDate(newInvDate);
+    }
+
+    if (supplier?.id && mappingsToSave?.length > 0) {
+      try {
+        await invoiceExtractorApi.saveMappings(supplier.id, mappingsToSave);
+      } catch (err) {
+        console.error("Failed to save supplier mappings:", err);
+      }
+    }
+
+    setStatus({
+      type: "success",
+      message: `Successfully imported ${newItems.length} item(s) from invoice!`,
+    });
+  };
+
+  const handleQuickCreateFromReconciliation = (initialData, callback) => {
+    setProductModalInitialData(initialData);
+    setQuickCreateCallback(() => callback);
+    setOpenProductModal(true);
   };
 
   // Items state
@@ -869,6 +933,25 @@ const PurchaseEntry = () => {
                         </Typography>
                       </Box>
                     )}
+                    {extractedInvoiceData?.data?.items?.length > 0 && (
+                      <Button
+                        size="small"
+                        onClick={() => setOpenReconciliationModal(true)}
+                        sx={{
+                          fontSize: "11.5px",
+                          fontWeight: 700,
+                          color: "#059669",
+                          bgcolor: "#ecfdf5",
+                          border: "1px solid #a7f3d0",
+                          p: "2px 8px",
+                          minWidth: "auto",
+                          borderRadius: "4px",
+                          "&:hover": { bgcolor: "#d1fae5" },
+                        }}
+                      >
+                        Reconcile ({extractedInvoiceData.data.items.length})
+                      </Button>
+                    )}
                     <Button
                       size="small"
                       onClick={handleViewPdf}
@@ -1156,9 +1239,38 @@ const PurchaseEntry = () => {
         }}
       />
 
-      <AddProductModal open={openProductModal} initialName={addProductName}
-        onClose={() => setOpenProductModal(false)}
-        onAdded={(p) => { handleProductSelect(p); setOpenProductModal(false); }} />
+      <AddProductModal
+        open={openProductModal}
+        initialName={addProductName}
+        initialData={productModalInitialData}
+        onClose={() => {
+          setOpenProductModal(false);
+          setProductModalInitialData(null);
+          setQuickCreateCallback(null);
+        }}
+        onAdded={(p) => {
+          if (quickCreateCallback) {
+            quickCreateCallback(p);
+          } else {
+            handleProductSelect(p);
+          }
+          setOpenProductModal(false);
+          setProductModalInitialData(null);
+          setQuickCreateCallback(null);
+        }}
+      />
+
+      {openReconciliationModal && extractedInvoiceData && (
+        <InvoiceReconciliationModal
+          key={extractedInvoiceData?.data?.metadata?.invoiceNumber || invoicePdf?.name || "reconcile-modal"}
+          open={openReconciliationModal}
+          onClose={() => setOpenReconciliationModal(false)}
+          extractedData={extractedInvoiceData}
+          currentSupplier={supplier}
+          onConfirm={handleReconciliationConfirm}
+          onQuickCreateProduct={handleQuickCreateFromReconciliation}
+        />
+      )}
     </Box>
   );
 };

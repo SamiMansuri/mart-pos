@@ -302,14 +302,31 @@ export const purchasesApi = {
 };
 
 export const invoiceExtractorApi = {
-  extract: (file, method = 'auto') => {
+  extract: (file, supplierId = null, method = 'auto') => {
     const formData = new FormData();
     formData.append('file', file);
-    let url = '/invoice-extractor/extract';
-    if (method) url += `?method=${encodeURIComponent(method)}`;
+    if (supplierId) {
+      formData.append('supplier_id', String(supplierId));
+    }
+    const params = new URLSearchParams();
+    if (method) params.append('method', method);
+    if (supplierId) params.append('supplier_id', String(supplierId));
+    
+    const query = params.toString();
+    const url = `/invoice-extractor/extract${query ? `?${query}` : ''}`;
     return apiFetch(url, {
       method: 'POST',
       body: formData,
     });
   },
+  saveMappings: (supplierId, mappings) =>
+    apiFetch('/invoice-extractor/mappings', {
+      method: 'POST',
+      body: JSON.stringify({
+        supplier_id: supplierId,
+        mappings,
+      }),
+    }),
+  getMappings: (supplierId) =>
+    apiFetch(`/invoice-extractor/mappings/${supplierId}`),
 };

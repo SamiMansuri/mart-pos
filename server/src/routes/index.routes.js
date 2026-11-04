@@ -10,6 +10,7 @@ import luckyDrawRouter from "./luckydraw.routes.js";
 import supplierRoutes from "./suppliers.routes.js";
 import purchaseRoutes from "./purchases.routes.js";
 import gstReportsRoutes from "./gstReports.routes.js";
+import invoiceExtractorRoutes from "./invoiceExtractor.routes.js";
 
 const router = express.Router();
 
@@ -24,6 +25,7 @@ router.use("/customers", customersRouter);
 router.use("/lucky-draw", luckyDrawRouter);
 router.use("/suppliers", supplierRoutes);
 router.use("/purchases", purchaseRoutes);
+router.use("/invoice-extractor", invoiceExtractorRoutes);
 router.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
 
 export default router;
