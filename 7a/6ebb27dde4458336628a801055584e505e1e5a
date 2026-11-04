@@ -1,0 +1,21 @@
+server/migrations/1793301701201_create-supplier-product-mappings.js
+  h_67e264807cd63e 1-57
+server/server.js
+  h_67e264807cd63e 11
+server/.env.prod
+  h_67e264807cd63e 1
+server/.env.stage
+  h_67e264807cd63e 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "2.0.2",
+  "base_commit_sha": "7a6ebb27dde4458336628a801055584e505e1e5a",
+  "branch": "dev",
+  "prompts": {},
+  "humans": {
+    "h_67e264807cd63e": {
+      "author": "SamiMansuri <samimansuri303@gmail.com>"
+    }
+  }
+}
