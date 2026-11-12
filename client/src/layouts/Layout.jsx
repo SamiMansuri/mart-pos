@@ -29,6 +29,7 @@ import {
   People as PeopleIcon,
   Menu as MenuIcon,
   BarChart as ReportsIcon,
+  ReceiptLong as GstIcon,
   Lock as LockIcon,
   MoreVert as MoreIcon,
   Contacts as ContactsIcon,
@@ -71,6 +72,7 @@ const Layout = () => {
   };
 
   const getCurrentTab = () => {
+    if (location.pathname.startsWith('/admin/reports/gst') || location.pathname.startsWith('/admin/gst-summary')) return '/admin/reports/gst';
     if (location.pathname.startsWith('/admin/reports')) return '/admin/reports';
     if (location.pathname.startsWith('/admin/users')) return '/admin/users';
     if (location.pathname.startsWith('/admin/products'))
@@ -104,6 +106,7 @@ const Layout = () => {
           { text: 'Purchase History', icon: <HistoryIcon />, path: '/admin/purchases' },
           { text: 'Lucky Draw', icon: <GiftIcon />, path: '/admin/lucky-draw' },
           { text: 'Reports', icon: <ReportsIcon />, path: '/admin/reports' },
+          { text: 'GST Summary', icon: <GstIcon />, path: '/admin/reports/gst' },
         ]
       : []),
     ...(isCashierUser

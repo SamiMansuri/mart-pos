@@ -18,6 +18,7 @@ import ReturnBill from './pages/ReturnBill';
 import BillView from './pages/BillView';
 import AdminBillDetails from './pages/AdminBillDetails';
 import Reports from './pages/Reports';
+import GstSummaryReport from './pages/GstSummaryReport';
 import CashierReport from './pages/CashierReport';
 import StockEntry from './pages/StockEntry';
 import ChangePassword from './pages/ChangePassword';
@@ -278,7 +279,15 @@ function App() {
               </RoleGuard>
             }
           />
-
+          <Route
+            path="admin/reports/gst"
+            element={
+              <RoleGuard allowedRoles={['admin']}>
+                <GstSummaryReport />
+              </RoleGuard>
+            }
+          />
+          
           <Route
             path="change-password"
             element={

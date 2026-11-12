@@ -8,9 +8,10 @@ const API_URL = import.meta.env.VITE_API_URL;
  */
 export const apiFetch = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   };
@@ -38,11 +39,61 @@ export const apiFetch = async (endpoint, options = {}) => {
       throw data || { message: 'Something went wrong' };
     }
 
-    return data.data;
+    return data.data !== undefined ? data.data : data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
   }
+};
+
+/**
+ * Authenticated blob downloader for Excel exports
+ * @param {string} endpoint - API endpoint
+ * @param {string} defaultFilename - Fallback filename
+ */
+export const downloadReportBlob = async (endpoint, defaultFilename = 'report.xlsx') => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+
+  const response = await fetch(`${API_URL}${endpoint}`, { headers });
+
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
+
+  if (!response.ok) {
+    let errorMsg = 'Download failed';
+    try {
+      const err = await response.json();
+      errorMsg = err.error || err.message || errorMsg;
+    } catch {
+      // ignore json parse error on non-json error responses
+    }
+    throw new Error(errorMsg);
+  }
+
+  let filename = defaultFilename;
+  const disposition = response.headers.get('content-disposition');
+  if (disposition) {
+    const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    if (match && match[1]) {
+      filename = match[1].replace(/['"]/g, '').trim();
+    }
+  }
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
 };
 
 export const billsApi = {
@@ -212,10 +263,24 @@ export const reportsApi = {
   getStats: (startDate, endDate) =>
     apiFetch(`/reports?startDate=${startDate}&endDate=${endDate}`),
   getCashierReport: (date) => apiFetch(`/reports/cashier?date=${date}`),
+  getGstSummary: (from, to) =>
+    apiFetch(`/gst-reports/gst-summary?from=${from}&to=${to}`),
+  getPurchaseRegister: (from, to) =>
+    apiFetch(`/gst-reports/purchase-register?from=${from}&to=${to}`),
+  downloadGstSummary: (from, to) =>
+    downloadReportBlob(`/gst-reports/gst-summary?from=${from}&to=${to}&format=xlsx`, `gst-summary_${from}_to_${to}.xlsx`),
+  downloadSalesRegister: (from, to) =>
+    downloadReportBlob(`/gst-reports/sales-register?from=${from}&to=${to}&format=xlsx`, `sales-register_${from}_to_${to}.xlsx`),
+  downloadPurchaseRegister: (from, to) =>
+    downloadReportBlob(`/gst-reports/purchase-register?from=${from}&to=${to}&format=xlsx`, `purchase-register_${from}_to_${to}.xlsx`),
 };
 
 export const suppliersApi = {
-  getAll: () => apiFetch('/suppliers'),
+  getAll: (search = '') => {
+    let url = '/suppliers';
+    if (search) url += `?q=${encodeURIComponent(search)}`;
+    return apiFetch(url);
+  },
   create: (data) => apiFetch('/suppliers', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -234,4 +299,34 @@ export const purchasesApi = {
       method: 'POST',
       body: JSON.stringify(paymentData),
     }),
+};
+
+export const invoiceExtractorApi = {
+  extract: (file, supplierId = null, method = 'auto') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (supplierId) {
+      formData.append('supplier_id', String(supplierId));
+    }
+    const params = new URLSearchParams();
+    if (method) params.append('method', method);
+    if (supplierId) params.append('supplier_id', String(supplierId));
+    
+    const query = params.toString();
+    const url = `/invoice-extractor/extract${query ? `?${query}` : ''}`;
+    return apiFetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+  },
+  saveMappings: (supplierId, mappings) =>
+    apiFetch('/invoice-extractor/mappings', {
+      method: 'POST',
+      body: JSON.stringify({
+        supplier_id: supplierId,
+        mappings,
+      }),
+    }),
+  getMappings: (supplierId) =>
+    apiFetch(`/invoice-extractor/mappings/${supplierId}`),
 };

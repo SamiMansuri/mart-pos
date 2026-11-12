@@ -1,0 +1,141 @@
+/* GstSummaryReport.css */
+
+.gst-report-container {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+/* Print-only header */
+.gst-print-header {
+  display: none;
+}
+
+/* Horizontal scroll wrapper for tables */
+.gst-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Numeric alignment */
+.gst-num-cell {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Totals Row */
+.gst-totals-row {
+  background-color: rgba(0, 0, 0, 0.03);
+  font-weight: 700 !important;
+}
+
+.gst-totals-row td {
+  font-weight: 700 !important;
+  border-top: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Negative return amount indicator */
+.gst-negative-amt {
+  color: #c62828;
+}
+
+/* Net GST Card */
+.gst-net-card {
+  border-left: 6px solid #1976d2 !important;
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+/* Print Stylesheet */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+
+  body {
+    background-color: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
+
+  /* Hide navigation, buttons, controls, banners during print */
+  .no-print,
+  header,
+  footer,
+  nav,
+  .MuiAppBar-root,
+  .MuiDrawer-root,
+  .gst-controls-card,
+  .gst-export-actions,
+  .gst-warning-banner,
+  .gst-info-line,
+  button {
+    display: none !important;
+  }
+
+  /* Show clean print header */
+  .gst-print-header {
+    display: block !important;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 8px;
+  }
+
+  .gst-print-title {
+    font-size: 18pt;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .gst-print-period {
+    font-size: 11pt;
+    color: #333;
+    margin-top: 4px;
+  }
+
+  /* Containers & Cards reset for print */
+  .MuiContainer-root {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .MuiPaper-root,
+  .MuiCard-root {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+    margin-bottom: 12px !important;
+  }
+
+  .gst-table-wrapper {
+    overflow: visible !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+    break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  th, td {
+    padding: 4px 6px !important;
+    font-size: 9pt !important;
+    border-bottom: 1px solid #ddd !important;
+  }
+
+  .gst-totals-row td {
+    border-top: 1.5px solid #000 !important;
+    font-weight: bold !important;
+  }
+}

@@ -182,6 +182,16 @@ export const createPurchase = asyncHandler(async (req, res) => {
         [parseFloat(item.gst_rate) || 0, item.product_id]
       );
 
+      if (item.hsn_code !== undefined && item.hsn_code !== null) {
+        const trimmedHsn = String(item.hsn_code).trim();
+        if (trimmedHsn) {
+          await client.query(
+            "UPDATE products SET hsn_code = $1 WHERE id = $2",
+            [trimmedHsn.slice(0, 8), item.product_id]
+          );
+        }
+      }
+
       // Record stock movement
       await client.query(STOCK_QUERIES.RECORD_MOVEMENT, [
         item.product_id,

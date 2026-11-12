@@ -29,9 +29,11 @@ import {
   Search as SearchIcon,
   ShoppingCart as CartIcon,
   PersonAdd as PersonAddIcon,
+  QrCodeScanner as QrCodeScannerIcon,
 } from '@mui/icons-material';
 import AddCustomerModal from '../components/AddCustomerModal';
 import BillSummary from '../components/BillSummary';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 // ProductCard component removed as it's no longer used in the new layout
 
@@ -164,6 +166,31 @@ const CashierDashboard = () => {
       }
     },
     [playBeep, playErrorSound, addToCart],
+  );
+
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const handleMobileScan = useCallback(
+    async (barcode) => {
+      if (!barcode || !barcode.trim()) return;
+      try {
+        const product = await productsApi.getByBarcode(barcode.trim());
+        if (product) {
+          addToCart(product);
+          setStatus({
+            type: 'success',
+            message: `Added "${product.name}" to cart`,
+          });
+          setTimeout(() => setStatus({ type: '', message: '' }), 2500);
+        }
+      } catch (err) {
+        console.error('Barcode lookup error:', err);
+        playErrorSound();
+        setStatus({ type: 'error', message: 'Product not found' });
+        setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      }
+    },
+    [addToCart, playErrorSound],
   );
 
   // Handle global barcode scanning
@@ -696,20 +723,23 @@ Best of luck!`;
             height: '100%',
           }}
         >
-          {/* Search Section */}
-          <Paper
-            elevation={activeSection === 'SEARCH' ? 4 : 0}
-            sx={{
-              p: 0,
-              border: '2px solid',
-              borderColor:
-                activeSection === 'SEARCH' ? 'primary.main' : 'divider',
-              borderRadius: 2,
-              flexShrink: 0,
-              // transition: 'all 0.2s ease-in-out',
-            }}
-          >
-            {' '}
+          {/* Search & Barcode Scan Section */}
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'stretch' }}>
+            <Paper
+              elevation={activeSection === 'SEARCH' ? 4 : 0}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                p: 0,
+                border: '2px solid',
+                borderColor:
+                  activeSection === 'SEARCH' ? 'primary.main' : 'divider',
+                borderRadius: 2,
+                flexShrink: 0,
+                // transition: 'all 0.2s ease-in-out',
+              }}
+            >
+              {' '}
             <Autocomplete
               openOnFocus
               clearOnBlur
@@ -807,6 +837,27 @@ Best of luck!`;
             />
           </Paper>
 
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<QrCodeScannerIcon />}
+            onClick={() => setScannerOpen(true)}
+            sx={{
+              display: { xs: 'inline-flex', md: 'none' },
+              px: { xs: 2, sm: 2.5 },
+              borderRadius: 2,
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              textTransform: 'none',
+              fontSize: { xs: '0.875rem', sm: '0.95rem' },
+              boxShadow: 2,
+            }}
+          >
+            Scan
+          </Button>
+        </Box>
+
           {/* Hidden Barcode Input removed: using global listener instead */}
 
           {/* Cart Table Section */}
@@ -856,6 +907,12 @@ Best of luck!`;
                     align="right"
                     sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
                   >
+                    MRP
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ fontWeight: 700, bgcolor: 'background.paper' }}
+                  >
                     Price
                   </TableCell>
                   <TableCell
@@ -874,7 +931,7 @@ Best of luck!`;
                 {cart.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       align="center"
                       sx={{ py: 10, borderBottom: 'none' }}
                     >
@@ -885,11 +942,19 @@ Best of luck!`;
                     </TableCell>
                   </TableRow>
                 ) : (
-                  cart.map((item, index) => (
-                    <TableRow
-                      key={item.id}
-                      hover
-                      selected={index === selectedCartIndex}
+                  cart.map((item, index) => {
+                    const mrp =
+                      item.mrp !== null &&
+                      item.mrp !== undefined &&
+                      item.mrp !== ''
+                        ? item.mrp
+                        : item.selling_price;
+
+                    return (
+                      <TableRow
+                        key={item.id}
+                        hover
+                        selected={index === selectedCartIndex}
                       sx={{
                         '&.Mui-selected': {
                           bgcolor: 'primary.action.selected',
@@ -1029,6 +1094,9 @@ Best of luck!`;
                         </Box>
                       </TableCell>
                       <TableCell align="right">
+                        ₹{parseFloat(mrp || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell align="right">
                         ₹{parseFloat(item.selling_price).toFixed(2)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 700 }}>
@@ -1044,8 +1112,9 @@ Best of luck!`;
                         </IconButton>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
+                  );
+                })
+              )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -1162,6 +1231,14 @@ Best of luck!`;
         onClose={() => setAddCustomerModalOpen(false)}
         onSuccess={handleCustomerCreated}
       />
+
+      {/* Mobile Barcode Scanner Modal / Overlay */}
+      {scannerOpen && (
+        <BarcodeScanner
+          onScan={handleMobileScan}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
     </Box>
   );
 };
